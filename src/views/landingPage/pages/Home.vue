@@ -19,14 +19,14 @@
             </div>
 
             <div class="flex items-center space-x-3 sm:space-x-4">
-                <button
+                <a href="/auth/login"
                     class="px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg border border-white/30 hover:bg-white/10 transition duration-300 text-sm sm:text-base">
                     Entrar
-                </button>
-                <button
+                </a>
+                <a href="/auth/registro"
                     class="px-5 hidden lg:block py-2.5 sm:px-6 sm:py-3 bg-white text-primary font-semibold rounded-lg shadow-lg hover:bg-gray-100 transition duration-300 transform hover:-translate-y-1 hover:scale-105">
                     Teste Grátis 14 dias
-                </button>
+                </a>
             </div>
         </nav>
 
@@ -41,10 +41,10 @@
                 online — tudo num só lugar.
             </p>
             <div class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6">
-                <button
+                <a href="/auth/registro"
                     class="px-6 py-3 sm:px-8 sm:py-4 bg-accent text-white font-bold text-base sm:text-lg rounded-xl shadow-xl hover:bg-emerald-600 transition duration-300 transform hover:scale-105 animate-scale-in [animation-delay:400ms]">
                     Começar Gratuitamente
-                </button>
+                </a>
                 <button
                     class="px-6 py-3 sm:px-8 sm:py-4 bg-white/10 backdrop-blur-md text-white font-semibold text-base sm:text-lg rounded-xl border border-white/30 hover:bg-white/20 transition duration-300 animate-scale-in [animation-delay:500ms]">
                     Ver Demonstração
@@ -160,10 +160,10 @@
                 class="text-lg sm:text-xl md:text-2xl text-white/90 mb-8 sm:mb-10 max-w-3xl mx-auto animate-fade [animation-delay:200ms]">
                 Experimenta o Alinifacture sem compromisso por 14 dias. Sem cartão, sem complicações.
             </p>
-            <button
+            <a href="/auth/registro"
                 class="px-8 py-4 sm:px-10 sm:py-5 bg-white text-primary font-bold text-lg sm:text-xl rounded-xl shadow-2xl hover:bg-gray-100 transition duration-300 transform hover:scale-105 animate-scale-in [animation-delay:400ms]">
                 Criar Conta Grátis Agora
-            </button>
+            </a>
         </div>
     </section>
 
@@ -225,10 +225,10 @@
                         </li>
                     </ul>
 
-                    <button
-                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 transform hover:scale-105">
+                    <a href="/auth/registro?plano=pequeno"
+                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 text-center transform hover:scale-105">
                         Escolher Plano Pequeno
-                    </button>
+                    </a>
                 </div>
 
                 <!-- Plano Médio (Popular) -->
@@ -291,10 +291,10 @@
                         </li>
                     </ul>
 
-                    <button
-                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 transform hover:scale-105">
+                    <a href="/auth/registro?plano=medio"
+                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 text-center transform hover:scale-105">
                         Escolher Plano Médio
-                    </button>
+                    </a>
                 </div>
 
                 <!-- Plano Grande -->
@@ -367,10 +367,10 @@
                         </li>
                     </ul>
 
-                    <button
-                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 transform hover:scale-105">
+                    <a href="/auth/registro?plano=grande"
+                        class="mt-auto px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primaryDark transition duration-300 text-center transform hover:scale-105">
                         Escolher Plano Grande
-                    </button>
+                    </a>
                 </div>
             </div>
 

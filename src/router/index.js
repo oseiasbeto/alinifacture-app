@@ -19,7 +19,7 @@ router.beforeEach((to, from, next) => {
     }
   } else if (to.matched.some(record => record.meta.routeAuth)) {
     if (token) {
-      next('/')
+      next('/dashboard')
     } else {
       next()
     }

@@ -8,7 +8,7 @@ const node_env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev'
 const instance = axios.create({
     baseURL: node_env == 'dev' ? 
         'http://localhost:4444/v1' : 
-        'https://piweto.it.ao/api/v1',
+        'https://alinifacture.com/api/v1',
     headers: {
         'Content-Type': 'application/json'
     }
@@ -36,7 +36,7 @@ instance.interceptors.response.use(
             originalRequest._retry = true;
 
             // Remove o refreshKey e redireciona para o login
-            Cookies.remove("refresh_token_key")
+            Cookies.remove("session_id")
             console.warn('Token expirado. Redirecionando para o login...');
             window.location.href = '/';
             return Promise.reject(error);
