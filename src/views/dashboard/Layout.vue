@@ -27,7 +27,7 @@ const initializeAuthFlow = async () => {
     }
 }
 
-onMounted(async () => {
+onMounted(async () => {z
     if (!isAuthenticated.value) {
         await initializeAuthFlow();
     } else {
