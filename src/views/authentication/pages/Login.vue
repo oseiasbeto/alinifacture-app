@@ -79,6 +79,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
+import { toast } from "vue3-toastify"
 
 const store = useStore()
 const router = useRouter()
@@ -113,12 +114,19 @@ const handleSubmit = async () => {
   isLoading.value = true
 
   try {
-    await store.dispatch('login', { 
-      email: email.value.trim(), 
-      password: password.value 
+    await store.dispatch('login', {
+      email: email.value.trim(),
+      password: password.value
     })
+
+    router.push('/dashboard')
   } catch (error) {
-    console.log('Erro ao entrar. Verifica as credenciais.')
+    toast(error?.response?.data?.message || 'Erro ao entrar. Verifica as credenciais.', {
+      theme: "colored",
+      position: "top-right",
+      autoClose: 2500,
+      type: 'error'
+    })
   } finally {
     isLoading.value = false
   }

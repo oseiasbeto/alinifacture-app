@@ -18,7 +18,6 @@ export default {
             setSessionIdFromCookies(sessionId);
         },
         LOGOUT(state) {
-            state.user = null
             state.token = null
             state.sessionId = null
 
@@ -69,9 +68,9 @@ export default {
         async login({ commit }, { email, password }) {
             try {
                 const res = await api.post("/utilizadores/login", { email, palavraPasse: password });
-                const { user, accessToken, sessionId } = res.data;
+                const { utilizador: user, accessToken, sessaoId } = res.data;
 
-                commit('SET_AUTH', { user, accessToken, sessionId })
+                commit('SET_AUTH', { user, accessToken, sessionId: sessaoId })
                 return res
             } catch (err) {
                 console.error('Erro ao fazer login:', err.message);
@@ -80,24 +79,38 @@ export default {
         },
         async refreshToken({ commit }, sessionId) {
             try {
-                const res = await api.post("/auth/refrescar-token", {
-                    sessionId: sessionId,
+                const res = await api.post("/utilizadores/refresh-token", {
+                    session_id: sessionId,
                 });
 
-                const user = res.data.user;
+                const user = res.data.utilizador;
                 const accessToken = res.data.access_token;
 
                 commit('SET_AUTH', {
                     user,
                     accessToken: accessToken,
-                    session_id: sessionId
+                    sessionId: sessionId
                 })
                 return res
             } catch (err) {
                 if (err.response?.status === 401) {
-                    // Se a resposta indicar que o token não é mais válido, limpa o session_id.
                     clearSessionIdFromCookies();
-                    disconnectSocket();
+                }
+                console.error(err.message);
+                throw err;
+            }
+        },
+        async logout({ commit }, sessionId) {
+            try {
+                const res = await api.post("/utilizadores/logout", {
+                    session_id: sessionId,
+                })
+                
+                commit('LOGOUT')
+                return res
+            } catch (err) {
+                if (err.response?.status === 401) {
+                    clearSessionIdFromCookies();
                 }
                 console.error(err.message);
                 throw err;

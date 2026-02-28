@@ -13,7 +13,7 @@ const instance = axios.create({
         'Content-Type': 'application/json'
     }
 })
-
+/*
 instance.interceptors.response.use(
     response => response,
     error => {
@@ -24,6 +24,8 @@ instance.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+
 
 // Interceptor de resposta 
 instance.interceptors.response.use(
@@ -44,7 +46,7 @@ instance.interceptors.response.use(
 
         return Promise.reject(error);
     }
-);
+); */
 
 instance.interceptors.response.use(
     response => response,
@@ -56,6 +58,7 @@ instance.interceptors.response.use(
     }
 );
 
+/* 
 instance.interceptors.response.use(
     response => response,
     error => {
@@ -64,7 +67,7 @@ instance.interceptors.response.use(
         }
         return Promise.reject(error);
     }
-)
+)*/
 
 instance.interceptors.request.use((config) => {
     const hasLogged = store.getters.hasLogged

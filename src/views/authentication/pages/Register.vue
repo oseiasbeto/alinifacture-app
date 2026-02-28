@@ -119,6 +119,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
+import { toast } from "vue3-toastify"
 
 const store = useStore()
 const router = useRouter()
@@ -203,12 +204,24 @@ const handleSubmit = async () => {
       palavraPasse: password.value.trim()
     })
 
-    router.push('/dashboard')
+    toast('Conta criada com sucesso! Bem-vindo à Alinifacture.', {
+      theme: "colored",
+      position: "top-right",
+      autoClose: 2500,
+      type: 'success'
+    })
 
+    setTimeout(() => {
+       router.push('/dashboard')
+    }, 2500)
   } catch (error) {
     resetForm()
-    console.log('Erro ao criar conta. Verifica os dados e tenta novamente.')
-  } finally {
+    toast(error?.response?.data?.message || 'Erro ao criar conta.', {
+      theme: "colored",
+      position: "top-right",
+      autoClose: 2500,
+      type: 'error'
+    })
     isLoading.value = false
   }
 }
