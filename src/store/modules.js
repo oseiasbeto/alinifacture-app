@@ -1,7 +1,7 @@
 import authentication from '../views/authentication/store'
-import landingPage from '../views/landingPage/store'
+import dashboard from '../views/dashboard/store'
 
 export default {
     authentication,
-    landingPage
+    dashboard
 }

@@ -84,7 +84,7 @@ export default {
                 });
 
                 const user = res.data.utilizador;
-                const accessToken = res.data.access_token;
+                const accessToken = res.data.accessToken;
 
                 commit('SET_AUTH', {
                     user,

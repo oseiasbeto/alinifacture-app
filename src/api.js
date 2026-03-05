@@ -46,7 +46,7 @@ instance.interceptors.response.use(
 
         return Promise.reject(error);
     }
-); */
+); 
 
 instance.interceptors.response.use(
     response => response,
@@ -57,7 +57,7 @@ instance.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
+*/
 /* 
 instance.interceptors.response.use(
     response => response,
@@ -70,8 +70,9 @@ instance.interceptors.response.use(
 )*/
 
 instance.interceptors.request.use((config) => {
-    const hasLogged = store.getters.hasLogged
-    if (hasLogged) {
+    const isAuthenticated = store.getters.accessToken !== null
+
+    if (isAuthenticated) {
         const token = store.getters.accessToken
         config.headers.Authorization = `Bearer ${token}`
     }
