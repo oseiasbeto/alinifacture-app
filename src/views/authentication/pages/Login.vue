@@ -1,76 +1,63 @@
 <template>
-  <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-5">
-    <div class="card border rounded-3" style="max-width: 420px; width: 100%;">
-      <div class="card-body p-4 p-md-5">
+  <div class="ledger-scope min-vh-100 d-flex align-items-center justify-content-center login-bg py-5">
+    <div class="login-card">
 
-        <!-- Logo e título -->
-        <div class="text-center mb-5">
-          <img src="../../../assets/palheta.png" alt="Alinifacture Logo" class="img-fluid mb-4 mx-auto"
-            style="max-height: 80px;">
-          <h3 class="fw-bold mb-2">Entrar na tua conta</h3>
-          <p class="text-muted small mb-0">
-            Gerencie as tuas facturas e pagamentos
-          </p>
+      <div class="text-center mb-5">
+        <img src="../../../assets/logo.png" alt="Gráfica do Leste Logo" class="img-fluid mb-4 mx-auto login-logo">
+        <p class="eyebrow">Gráfica do Leste</p>
+        <h3 class="ledger-title">Acesso ao Sistema</h3>
+        <p class="text-sm text-stone-500 mt-2 mb-0">
+          Gerencie pedidos, produção e faturação da Gráfica do Leste
+        </p>
+      </div>
+
+      <!-- Formulário com validação em tempo real -->
+      <form class="needs-validation" novalidate @submit.prevent="handleSubmit">
+        <!-- Email -->
+        <div class="mb-3">
+          <label for="loginEmail" class="ledger-label">Email</label>
+          <input v-model.trim="email" type="email" id="loginEmail" class="ledger-input" placeholder="nome@exemplo.ao"
+            :class="{
+              'input-valid': emailTouched && emailValid,
+              'input-invalid': emailTouched && !emailValid
+            }" @input="emailTouched = true" required>
+          <div v-if="emailTouched && !emailValid" class="field-feedback">
+            Email inválido
+          </div>
         </div>
 
-        <!-- Formulário com validação em tempo real -->
-        <form class="needs-validation" novalidate @submit.prevent="handleSubmit">
-          <!-- Email - Floating label -->
-          <div class="form-floating mb-3">
-            <input v-model.trim="email" type="email" class="form-control" id="floatingEmail"
-              placeholder="nome@exemplo.ao" :class="{
-                'is-valid': emailTouched && emailValid,
-                'is-invalid': emailTouched && !emailValid
-              }" @input="emailTouched = true" required>
-            <label for="floatingEmail">Email</label>
-            <div v-if="emailTouched && !emailValid" class="invalid-feedback">
-              Email inválido
-            </div>
+        <!-- Senha -->
+        <div class="mb-4">
+          <label for="loginPassword" class="ledger-label">Senha</label>
+          <input v-model="password" type="password" id="loginPassword" class="ledger-input" placeholder="Senha" :class="{
+            'input-valid': passwordTouched && passwordValid,
+            'input-invalid': passwordTouched && !passwordValid
+          }" @input="passwordTouched = true" required minlength="6">
+          <div v-if="passwordTouched && !passwordValid" class="field-feedback">
+            Mínimo 6 caracteres
           </div>
+        </div>
 
-          <!-- Senha - Floating label -->
-          <div class="form-floating mb-4">
-            <input v-model="password" type="password" class="form-control" id="floatingPassword" placeholder="Senha"
-              :class="{
-                'is-valid': passwordTouched && passwordValid,
-                'is-invalid': passwordTouched && !passwordValid
-              }" @input="passwordTouched = true" required minlength="6">
-            <label for="floatingPassword">Senha</label>
-            <div v-if="passwordTouched && !passwordValid" class="invalid-feedback">
-              Mínimo 6 caracteres
-            </div>
+        <!-- Lembrar-me + Esqueci senha -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rememberMe" />
+            <label class="form-check-label small text-stone-500" for="rememberMe">
+              Lembrar-me
+            </label>
           </div>
-
-          <!-- Lembrar-me + Esqueci senha -->
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="rememberMe" />
-              <label class="form-check-label small" for="rememberMe">
-                Lembrar-me
-              </label>
-            </div>
-            <a href="#" class="small text-decoration-none text-primary">
-              Esqueci a senha
-            </a>
-          </div>
-
-          <!-- Botão Entrar -->
-          <button type="submit" class="btn btn-primary w-100 py-2 fw-medium" :disabled="isLoading || !formIsValid">
-            <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"
-              aria-hidden="true"></span>
-            {{ isLoading ? 'A entrar...' : 'Entrar' }}
-          </button>
-        </form>
-
-        <!-- Link para criar conta -->
-        <div class="text-center mt-4 small text-muted">
-          Ainda não tens conta?
-          <a href="/auth/registro" class="text-primary text-decoration-none fw-medium">
-            Criar conta gratuita
+          <a href="#" class="small text-decoration-none link-rule">
+            Esqueci a senha
           </a>
         </div>
 
-      </div>
+        <!-- Botão Entrar -->
+        <button type="submit" class="btn-primary w-100 py-2" :disabled="isLoading || !formIsValid">
+          <span v-if="isLoading" class="spinner-sm me-2"></span>
+          {{ isLoading ? 'A entrar...' : 'Entrar' }}
+        </button>
+      </form>
+
     </div>
   </div>
 </template>
@@ -88,11 +75,9 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 
-// Flags para ativar validação só depois da primeira interação
 const emailTouched = ref(false)
 const passwordTouched = ref(false)
 
-// Validações em tempo real
 const emailValid = computed(() => {
   if (!email.value.trim()) return false
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())
@@ -103,7 +88,6 @@ const passwordValid = computed(() => password.value.length >= 6)
 const formIsValid = computed(() => emailValid.value && passwordValid.value)
 
 const handleSubmit = async () => {
-  // Marca todos como tocados para mostrar possíveis erros restantes
   emailTouched.value = true
   passwordTouched.value = true
 
@@ -134,19 +118,143 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-.form-control.is-valid {
-  border-color: #198754;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right calc(0.375em + 0.1875rem) center;
-  background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+.ledger-scope {
+  --ink: #201d1a;
+  --ink-soft: #4a453f;
+  --paper: #faf8f3;
+  --paper-line: #e7e0d3;
+  --rule: #b5433c;
+  --ok: #2f7d53;
+  --amber: #b8860b;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-.form-control.is-invalid {
-  border-color: #dc3545;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right calc(0.375em + 0.1875rem) center;
-  background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+.login-bg {
+  background: var(--paper);
+}
+
+.login-card {
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+  max-width: 420px;
+  width: 100%;
+  padding: 2.5rem 2.25rem;
+  position: relative;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--rule);
+  border-radius: 12px 12px 0 0;
+}
+
+.login-logo {
+  max-height: 70px;
+}
+
+.eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rule);
+  margin: 0 0 0.25rem;
+}
+
+.ledger-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--ink);
+  margin: 0;
+}
+
+.text-stone-500 {
+  color: #78716c;
+}
+
+.ledger-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin-bottom: 0.3rem;
+}
+
+.ledger-input {
+  width: 100%;
+  border: 1px solid var(--paper-line);
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ledger-input:focus {
+  border-color: var(--ink);
+}
+
+.input-valid {
+  border-color: var(--ok);
+}
+
+.input-invalid {
+  border-color: var(--rule);
+}
+
+.field-feedback {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--rule);
+}
+
+.link-rule {
+  color: var(--rule);
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

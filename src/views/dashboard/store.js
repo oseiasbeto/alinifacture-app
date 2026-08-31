@@ -4,6 +4,7 @@ export default {
     state: {
         // Se quiseres guardar os produtos e paginação no state (opcional, mas recomendado para reatividade)
         produtos: [],
+        produto: null, // Para detalhes de um único produto 
         pagination: {
             page: 1,
             limit: 10,
@@ -14,14 +15,34 @@ export default {
         },
         loadingProdutos: false,
         loadingClientes: false,
+        resumoProdutos: null,
         errorProdutos: null,
         errorClientes: null,
         clientes: [],
+        niveisEstoque: [],
+        paginationEstoqueNiveis: {},
+        niveisEstoqueLoading: false,
+        niveisEstoqueError: null,
+
+        resumoEstoque: null,
+        resumoEstoqueLoading: false,
+        resumoClientes: null,
+
+        movimentosEstoque: [],
+        paginationEstoqueMovimentos: {},
+        movimentosEstoqueLoading: false,
+        movimentosEstoqueError: null,
     },
     mutations: {
         SET_PRODUTOS(state, { docs, pagination }) {
             state.produtos = docs
             state.pagination = pagination
+        },
+        SET_PRODUTO(state, produto) {
+            state.produto = produto
+        },
+        SET_RESUMO_PRODUTOS(state, resumo) {
+            state.resumoProdutos = resumo
         },
         SET_LOADING_PRODUTOS(state, loading) {
             state.loadingProdutos = loading
@@ -38,7 +59,28 @@ export default {
         },
         SET_ERROR_CLIENTES(state, error) {
             state.errorClientes = error
-        }
+        },
+        SET_RESUMO_CLIENTES(state, resumo) {
+            state.resumoClientes = resumo
+        },
+        // Mutations para o estoque
+        SET_NIVEIS_ESTOQUE_LOADING(state, val) { state.niveisEstoqueLoading = val },
+        SET_NIVEIS_ESTOQUE(state, { niveis, pagination }) {
+            console.log(pagination)
+            state.niveisEstoque = niveis
+            state.paginationEstoqueNiveis = pagination
+        },
+        SET_NIVEIS_ESTOQUE_ERROR(state, err) { state.niveisEstoqueError = err },
+
+        SET_RESUMO_ESTOQUE_LOADING(state, val) { state.resumoEstoqueLoading = val },
+        SET_RESUMO_ESTOQUE(state, resumo) { state.resumoEstoque = resumo },
+
+        SET_MOVIMENTOS_ESTOQUE_LOADING(state, val) { state.movimentosEstoqueLoading = val },
+        SET_MOVIMENTOS_ESTOQUE(state, { movimentos, pagination }) {
+            state.movimentosEstoque = movimentos
+            state.paginationEstoqueMovimentos = pagination
+        },
+        SET_MOVIMENTOS_ESTOQUE_ERROR(state, err) { state.movimentosEstoqueError = err },
     },
     actions: {
         // Action existente (create)
@@ -93,6 +135,30 @@ export default {
                 throw err; // Propaga para componente mostrar alerta
             } finally {
                 commit('SET_LOADING_PRODUTOS', false);
+            }
+        },
+
+        async carregarResumoProdutos({ commit }) {
+            try {
+                const res = await api.get('/produtos/resumo')
+                const resumo = res.data.resumo
+                commit('SET_RESUMO_PRODUTOS', resumo)
+            } catch (err) {
+                console.error('Erro ao carregar resumo de clientes:', err.message)
+                throw err
+            }
+        },
+
+        // NOVA action: buscar um único produto por id (usada na tela de detalhes)
+        async getProduct({ commit }, id) {
+            try {
+                const res = await api.get(`/produtos/${id}`);
+
+                commit('SET_PRODUTO', res.data.produto); // Atualiza o state com o produto buscado 
+                return res.data.produto || res.data;
+            } catch (err) {
+                console.error('Erro ao buscar produto:', err.message);
+                throw err;
             }
         },
 
@@ -172,17 +238,105 @@ export default {
                 throw err
             }
         },
+
+        async carregarResumoClientes({ commit }) {
+            try {
+                const res = await api.get('/clientes/resumo')
+                const resumo = res.data.resumo
+                commit('SET_RESUMO_CLIENTES', resumo)
+            } catch (err) {
+                console.error('Erro ao carregar resumo de clientes:', err.message)
+                throw err
+            }
+        },
+
+        async listarNiveisEstoque({ commit }, { page = 1, limit = 10, busca, baixoEstoque, produtoId } = {}) {
+            commit('SET_NIVEIS_ESTOQUE_LOADING', true)
+            commit('SET_NIVEIS_ESTOQUE_ERROR', null)
+            try {
+                const { data } = await api.get('/estoque/niveis', {
+                    params: { page, limit, busca, baixoEstoque, produtoId },
+                })
+
+                console.log(data)
+                commit('SET_NIVEIS_ESTOQUE', { niveis: data.niveis, pagination: data.pagination })
+            } catch (err) {
+                commit('SET_NIVEIS_ESTOQUE_ERROR', err.response?.data?.message || 'Erro ao carregar estoque')
+                throw err
+            } finally {
+                commit('SET_NIVEIS_ESTOQUE_LOADING', false)
+            }
+        },
+
+        async carregarResumoEstoque({ commit }) {
+            commit('SET_RESUMO_ESTOQUE_LOADING', true)
+            try {
+                const { data } = await api.get('/estoque/resumo')
+                commit('SET_RESUMO_ESTOQUE', data.resumo)
+                return data.resumo
+            } finally {
+                commit('SET_RESUMO_ESTOQUE_LOADING', false)
+            }
+        },
+
+        async listarMovimentosEstoque({ commit }, { page = 1, limit = 10, produto, dataInicio, dataFim } = {}) {
+            commit('SET_MOVIMENTOS_ESTOQUE_LOADING', true)
+            commit('SET_MOVIMENTOS_ESTOQUE_ERROR', null)
+            try {
+                const { data } = await api.get('/estoque/movimentos', {
+                    params: { page, limit, produto, dataInicio, dataFim }
+                })
+                commit('SET_MOVIMENTOS_ESTOQUE', { movimentos: data.movimentos, pagination: data.pagination })
+            } catch (err) {
+                commit('SET_MOVIMENTOS_ESTOQUE_ERROR', err.response?.data?.message || 'Erro ao carregar movimentos')
+                throw err
+            } finally {
+                commit('SET_MOVIMENTOS_ESTOQUE_LOADING', false)
+            }
+        },
+
+        async registrarEntradaEstoque(_, payload) {
+            const { data } = await api.post('/estoque/entrada', payload)
+            return data
+        },
+
+        async registrarSaidaEstoque(_, payload) {
+            const { data } = await api.post('/estoque/saida', payload)
+            return data
+        },
+
+        async ajustarEstoque(_, payload) {
+            const { data } = await api.post('/estoque/ajuste', payload)
+            return data
+        },
     },
     getters: {
         // Getters úteis (opcional)
         produtosListados: state => state.produtos,
+        produtoDetalhado: state => state.produto,
         paginationInfo: state => state.pagination,
         produtosLoading: state => state.loadingProdutos,
         produtosError: state => state.errorProdutos,
+        resumoProdutos: state => state.resumoProdutos,
         hasMoreProducts: state => state.pagination.hasNextPage,
         clientesListados: state => state.clientes,
         clientesPagination: state => state.pagination,
+        resumoClientes: state => state.resumoClientes,
         clientesLoading: state => state.loading,
-        clientesError: state => state.errorClientes
+        clientesError: state => state.errorClientes,
+
+        // Getters para o estoque
+        niveisEstoque: (state) => state.niveisEstoque,
+        paginationNiveis: (state) => state.paginationEstoqueNiveis,
+        niveisLoading: (state) => state.niveisEstoqueLoading,
+        niveisError: (state) => state.niveisEstoqueError,
+
+        resumoEstoque: (state) => state.resumoEstoque,
+        resumoEstoqueLoading: (state) => state.resumoEstoqueLoading,
+
+        movimentosEstoque: (state) => state.movimentosEstoque,
+        paginationMovimentos: (state) => state.paginationEstoqueMovimentos,
+        movimentosLoading: (state) => state.movimentosEstoqueLoading,
+        movimentosError: (state) => state.movimentosEstoqueError
     }
 }

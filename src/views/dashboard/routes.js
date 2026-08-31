@@ -20,6 +20,26 @@ export default [
         component: () => import('./Layout.vue')
     },
     {
+        name: 'DetalhesProduto',
+        path: '/dashboard/produtos/:id',
+        meta: {
+            requiresAuth: true,
+            rootPage: 'dashboard',
+            title: 'Detalhes do produto | Painel de controlo',
+        },
+        component: () => import('./Layout.vue')
+    },
+    {
+        name: 'Stock',
+        path: '/dashboard/estoque',
+        meta: {
+            requiresAuth: true,
+            rootPage: 'dashboard',
+            title: 'Estoque | Painel de controlo',
+        },
+        component: () => import('./Layout.vue')
+    },
+    {
         name: 'Clients',
         path: '/dashboard/clientes',
         meta: {

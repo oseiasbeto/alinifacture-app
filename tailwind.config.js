@@ -4,7 +4,7 @@ module.exports = {
 theme: {
     extend: {
       colors: {
-        primary: '#2563eb',     // azul moderno
+        primary: '#ef4444',     // azul moderno
         primaryDark: '#1d4ed8',
         accent: '#10b981',      // verde sucesso/finanças
         neutral: {
