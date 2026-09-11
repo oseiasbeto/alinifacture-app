@@ -6,6 +6,7 @@ import { useStore } from "vuex";
 import { computed, onMounted, ref } from "vue";
 import Navbar from "./components/Navbar.vue";
 import Produtos from "./pages/Produtos.vue";
+import Caixa from "./pages/Caixa.vue";
 import Clientes from "./pages/Clientes.vue";
 import Produto from "./pages/Produto.vue";
 import Estoque from "./pages/Estoque.vue";
@@ -133,6 +134,7 @@ onMounted(async () => {
                     <Produto v-if="route.name == 'DetalhesProduto'" />
                     <Clientes v-if="route.path == '/dashboard/clientes'" />
                     <Estoque v-if="route.path == '/dashboard/estoque'" />
+                    <Caixa v-if="route.path == '/dashboard/caixa'" />
                 </div>
             </div>
         </main>

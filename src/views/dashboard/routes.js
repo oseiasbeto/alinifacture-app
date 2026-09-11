@@ -48,5 +48,15 @@ export default [
             title: 'Clientes | Painel de controlo',
         },
         component: () => import('./Layout.vue')
+    },
+    {
+        name: 'Caixa',
+        path: '/dashboard/caixa',
+        meta: {
+            requiresAuth: true,
+            rootPage: 'dashboard',
+            title: 'Caixa | Painel de controlo',
+        },
+        component: () => import('./Layout.vue')
     }
 ]

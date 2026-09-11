@@ -32,6 +32,12 @@ export default {
         paginationEstoqueMovimentos: {},
         movimentosEstoqueLoading: false,
         movimentosEstoqueError: null,
+
+        pedidos: [],
+        paginationPedidos: { page: 1, limit: 10, totalDocs: 0, totalPages: 0, hasNextPage: false, hasPrevPagePedidos: false },
+        loadingPedidos: false,
+        errorPedidos: null,
+        resumoPedidos: null,
     },
     mutations: {
         SET_PRODUTOS(state, { docs, pagination }) {
@@ -81,6 +87,20 @@ export default {
             state.paginationEstoqueMovimentos = pagination
         },
         SET_MOVIMENTOS_ESTOQUE_ERROR(state, err) { state.movimentosEstoqueError = err },
+
+        SET_PEDIDOS(state, { docs, pagination }) {
+            state.pedidos = docs
+            state.paginationPedidos = pagination
+        },
+        SET_LOADING_PEDIDOS(state, loading) {
+            state.loadingPedidos = loading
+        },
+        SET_ERROR_PEDIDOS(state, error) {
+            state.errorPedidos = error
+        },
+        SET_RESUMO_PEDIDOS(state, resumo) {
+            state.resumoPedidos = resumo
+        },
     },
     actions: {
         // Action existente (create)
@@ -309,6 +329,94 @@ export default {
             const { data } = await api.post('/estoque/ajuste', payload)
             return data
         },
+
+        async listarPedidos({ commit }, params = {}) {
+            commit('SET_LOADING_PEDIDOS', true)
+            commit('SET_ERROR_PEDIDOS', null)
+            try {
+                const queryParams = new URLSearchParams()
+                if (params.page) queryParams.append('page', params.page)
+                if (params.limit) queryParams.append('limit', params.limit)
+                if (params.status) queryParams.append('status', params.status)
+                if (params.busca) queryParams.append('busca', params.busca)
+
+                const res = await api.get(`/pedidos?${queryParams.toString()}`)
+
+                commit('SET_PEDIDOS', {
+                    docs: res.data.pedidos || [],
+                    pagination: res.data.pagination || {},
+                })
+
+                return res.data
+            } catch (err) {
+                console.error('Erro ao listar pedidos:', err.message)
+                commit('SET_ERROR_PEDIDOS', err.response?.data?.message || 'Erro ao carregar pedidos')
+                throw err
+            } finally {
+                commit('SET_LOADING_PEDIDOS', false)
+            }
+        },
+
+        async carregarResumoPedidos({ commit }) {
+            try {
+                const res = await api.get('/pedidos/resumo')
+                commit('SET_RESUMO_PEDIDOS', res.data.resumo)
+                return res.data.resumo
+            } catch (err) {
+                console.error('Erro ao carregar resumo de pedidos:', err.message)
+                throw err
+            }
+        },
+
+        async getPedido({ commit }, id) {
+            try {
+                const res = await api.get(`/pedidos/${id}`)
+                return res.data.pedido
+            } catch (err) {
+                console.error('Erro ao buscar pedido:', err.message)
+                throw err
+            }
+        },
+
+        async criarPedido({ commit }, payload) {
+            try {
+                const res = await api.post('/pedidos', payload)
+                return res.data.pedido
+            } catch (err) {
+                console.error('Erro ao criar pedido:', err.message)
+                throw err
+            }
+        },
+
+        async atualizarPedido({ commit }, { id, payload }) {
+            try {
+                const res = await api.put(`/pedidos/${id}`, payload)
+                return res.data.pedido
+            } catch (err) {
+                console.error('Erro ao atualizar pedido:', err.message)
+                throw err
+            }
+        },
+
+        async atualizarStatusPedido({ commit }, { id, status, observacao }) {
+            try {
+                const res = await api.patch(`/pedidos/${id}/status`, { status, observacao })
+                return res.data.pedido
+            } catch (err) {
+                console.error('Erro ao atualizar status do pedido:', err.message)
+                throw err
+            }
+        },
+
+        async excluirPedido({ commit }, id) {
+            try {
+                const res = await api.delete(`/pedidos/${id}`)
+                return res.data
+            } catch (err) {
+                console.error('Erro ao excluir pedido:', err.message)
+                throw err
+            }
+        },
     },
     getters: {
         // Getters úteis (opcional)
@@ -337,6 +445,12 @@ export default {
         movimentosEstoque: (state) => state.movimentosEstoque,
         paginationMovimentos: (state) => state.paginationEstoqueMovimentos,
         movimentosLoading: (state) => state.movimentosEstoqueLoading,
-        movimentosError: (state) => state.movimentosEstoqueError
+        movimentosError: (state) => state.movimentosEstoqueError,
+
+        pedidosListados: (state) => state.pedidos,
+        pedidosPagination: (state) => state.pagination,
+        pedidosLoading: (state) => state.loadingPedidos,
+        pedidosError: (state) => state.errorPedidos,
+        resumoPedidos: (state) => state.resumoPedidos,
     }
 }
