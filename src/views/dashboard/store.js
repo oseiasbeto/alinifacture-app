@@ -2,6 +2,9 @@ import api from '../../api'
 
 export default {
     state: {
+        dashboard: null,
+        loadingDashboard: false,
+        errorDashboard: null,
         // Se quiseres guardar os produtos e paginação no state (opcional, mas recomendado para reatividade)
         produtos: [],
         produto: null, // Para detalhes de um único produto 
@@ -40,6 +43,9 @@ export default {
         resumoPedidos: null,
     },
     mutations: {
+        SET_DASHBOARD(state, data) { state.dashboard = data },
+        SET_LOADING_DASHBOARD(state, v) { state.loadingDashboard = v },
+        SET_ERROR_DASHBOARD(state, e) { state.errorDashboard = e },
         SET_PRODUTOS(state, { docs, pagination }) {
             state.produtos = docs
             state.pagination = pagination
@@ -103,6 +109,22 @@ export default {
         },
     },
     actions: {
+        async carregarDashboard({ commit }, { dataInicio, dataFim } = {}) {
+            commit('SET_LOADING_DASHBOARD', true)
+            commit('SET_ERROR_DASHBOARD', null)
+            try {
+                const res = await api.get('/financeiro/resumo/dashboard', { params: { dataInicio, dataFim } })
+
+                console.log('Dashboard data:', res.data?.dashboard) // Log para debug
+                commit('SET_DASHBOARD', res.data?.dashboard)
+                return res.data
+            } catch (err) {
+                commit('SET_ERROR_DASHBOARD', err.response?.data?.message || 'Erro ao carregar dashboard')
+                throw err
+            } finally {
+                commit('SET_LOADING_DASHBOARD', false)
+            }
+        },
         // Action existente (create)
         async createProduct({ commit }, payload) {
             try {
@@ -420,6 +442,9 @@ export default {
     },
     getters: {
         // Getters úteis (opcional)
+        dashboard: (state) => state.dashboard,
+        loadingDashboard: (state) => state.loadingDashboard,
+        errorDashboard: (state) => state.errorDashboard,
         produtosListados: state => state.produtos,
         produtoDetalhado: state => state.produto,
         paginationInfo: state => state.pagination,

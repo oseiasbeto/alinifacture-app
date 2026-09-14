@@ -870,7 +870,7 @@ const limparFiltros = () => {
 }
 
 .btn-ghost {
-  background: transparent;
+  background: #fff;
   border: 1px solid var(--paper-line);
   color: var(--ink-soft);
   border-radius: 8px;

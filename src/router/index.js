@@ -13,7 +13,7 @@ router.beforeEach((to, from, next) => {
   const token = Cookies.get("session_id")
   if (to.matched.some(record => record.meta.requiresAuth)) {
     if (!token) {
-      next('/auth/login');
+      next('/');
     } else {
       next()
     }

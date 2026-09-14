@@ -1,7 +1,7 @@
 export default [
     {
         name: 'Login',
-        path: '/auth/login',
+        path: '/',
         meta: {
             routeAuth: true,
             rootPage: 'auth',

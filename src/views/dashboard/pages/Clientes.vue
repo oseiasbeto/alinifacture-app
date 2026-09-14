@@ -852,7 +852,7 @@ const gerarPDFClientes = () => {
 .btn-danger:disabled { opacity: 0.6; }
 
 .btn-ghost {
-  background: transparent;
+  background: #fff;
   border: 1px solid var(--paper-line);
   font-weight: 600;
   color: var(--ink-soft);
