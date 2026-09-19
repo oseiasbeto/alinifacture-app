@@ -7,27 +7,13 @@
         <div class="text-center mb-5">
           <img src="../../../assets/palheta.png" alt="Alinifacture Logo" class="img-fluid mb-4 mx-auto"
             style="max-height: 80px;">
-          <h3 class="fw-bold mb-2">Criar conta Alinifacture</h3>
+          <h3 class="fw-bold mb-2">Registar utilizador</h3>
           <p class="text-muted small mb-0">
-            Comece a gerir facturas e pagamentos hoje mesmo
+            Preencha os dados para cadastrar um novo utilizador
           </p>
         </div>
 
-        <!-- Formulário de cadastro com validação em tempo real -->
         <form class="needs-validation" novalidate @submit.prevent="handleSubmit">
-          <!-- Nome da Empresa -->
-          <div class="form-floating mb-3">
-            <input v-model.trim="empresa" type="text" class="form-control" id="floatingEmpresa" autocomplete="off"
-              placeholder="Nome da Empresa" :class="{
-                'is-valid': empresaTouched && empresaValid,
-                'is-invalid': empresaTouched && !empresaValid
-              }" @input="empresaTouched = true" required minlength="3">
-            <label for="floatingEmpresa">Nome da Empresa</label>
-            <div v-if="empresaTouched && !empresaValid" class="invalid-feedback">
-              Pelo menos 3 caracteres
-            </div>
-          </div>
-
           <!-- Nome do Utilizador -->
           <div class="form-floating mb-3">
             <input v-model.trim="nome" type="text" class="form-control" id="floatingNome" autocomplete="off"
@@ -35,7 +21,7 @@
                 'is-valid': nomeTouched && nomeValid,
                 'is-invalid': nomeTouched && !nomeValid
               }" @input="nomeTouched = true" required minlength="3">
-            <label for="floatingNome">Nome do Utilizador</label>
+            <label for="floatingNome">Nome completo</label>
             <div v-if="nomeTouched && !nomeValid" class="invalid-feedback">
               Pelo menos 3 caracteres
             </div>
@@ -54,16 +40,40 @@
             </div>
           </div>
 
+          <!-- Telefone -->
+          <div class="form-floating mb-3">
+            <input v-model.trim="telefone" type="tel" class="form-control" id="floatingTelefone" autocomplete="off"
+              placeholder="Telefone" :class="{
+                'is-valid': telefoneTouched && telefoneValid,
+                'is-invalid': telefoneTouched && !telefoneValid
+              }" @input="telefoneTouched = true">
+            <label for="floatingTelefone">Telefone (opcional)</label>
+            <div v-if="telefoneTouched && !telefoneValid" class="invalid-feedback">
+              Telefone inválido
+            </div>
+          </div>
+
+          <!-- Cargo -->
+          <div class="form-floating mb-3">
+            <select v-model="cargo" class="form-select" id="floatingCargo">
+              <option value="gerente">Gerente</option>
+              <option value="caixa">Caixa</option>
+              <option value="visualizador">Visualizador</option>
+              <option value="administrador">Administrador</option>
+            </select>
+            <label for="floatingCargo">Cargo</label>
+          </div>
+
           <!-- Palavra-passe -->
           <div class="form-floating mb-3">
             <input v-model="password" type="password" class="form-control" id="floatingPassword"
               autocomplete="new-password" placeholder="Palavra-passe" :class="{
                 'is-valid': passwordTouched && passwordValid,
                 'is-invalid': passwordTouched && !passwordValid
-              }" @input="passwordTouched = true" required minlength="6">
+              }" @input="passwordTouched = true" required minlength="8">
             <label for="floatingPassword">Palavra-passe</label>
             <div v-if="passwordTouched && !passwordValid" class="invalid-feedback">
-              Mínimo 6 caracteres
+              Mínimo 8 caracteres
             </div>
           </div>
 
@@ -94,18 +104,18 @@
             </div>
           </div>
 
-          <!-- Botão Criar Conta -->
+          <!-- Botão -->
           <button type="submit" class="btn btn-primary w-100 py-2 fw-medium" :disabled="isLoading || !formIsValid">
             <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"
               aria-hidden="true"></span>
-            {{ isLoading ? 'A criar conta...' : 'Criar conta gratuita' }}
+            {{ isLoading ? 'A registar...' : 'Registar utilizador' }}
           </button>
         </form>
 
         <!-- Link para login -->
         <div class="text-center mt-4 select-none small text-muted">
           Já tens conta?
-          <a href="/auth/login" class="text-primary text-decoration-none fw-medium">
+          <a href="/" class="text-primary text-decoration-none fw-medium">
             Entrar
           </a>
         </div>
@@ -124,18 +134,19 @@ import { toast } from "vue3-toastify"
 const store = useStore()
 const router = useRouter()
 
-// Campos do formulário (não persistem — voltam ao vazio ao recarregar a página)
-const empresa = ref('')
+// Campos do formulário
 const nome = ref('')
 const email = ref('')
+const telefone = ref('')
+const cargo = ref('gerente')
 const password = ref('')
 const confirmPassword = ref('')
 const aceitaTermos = ref(false)
 
 // Flags para mostrar validação só depois do utilizador interagir com o campo
-const empresaTouched = ref(false)
 const nomeTouched = ref(false)
 const emailTouched = ref(false)
+const telefoneTouched = ref(false)
 const passwordTouched = ref(false)
 const confirmTouched = ref(false)
 const termosTouched = ref(false)
@@ -143,22 +154,26 @@ const termosTouched = ref(false)
 const isLoading = ref(false)
 
 // Validações em tempo real
-const empresaValid = computed(() => empresa.value.trim().length >= 3)
 const nomeValid = computed(() => nome.value.trim().length >= 3)
 const emailValid = computed(() => {
   if (!email.value.trim()) return false
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())
 })
-const passwordValid = computed(() => password.value.length >= 6)
+// Telefone é opcional: vazio é válido; se preenchido, aceita 9 a 15 dígitos
+const telefoneValid = computed(() => {
+  if (!telefone.value.trim()) return true
+  return /^\+?[0-9\s]{9,15}$/.test(telefone.value.trim())
+})
+const passwordValid = computed(() => password.value.length >= 8)
 const confirmPasswordValid = computed(() => {
   return password.value && password.value === confirmPassword.value
 })
 
 const formIsValid = computed(() => {
   return (
-    empresaValid.value &&
     nomeValid.value &&
     emailValid.value &&
+    telefoneValid.value &&
     passwordValid.value &&
     confirmPasswordValid.value &&
     aceitaTermos.value
@@ -166,26 +181,26 @@ const formIsValid = computed(() => {
 })
 
 const resetForm = () => {
-  empresa.value = ''
   nome.value = ''
   email.value = ''
+  telefone.value = ''
+  cargo.value = 'utilizador'
   password.value = ''
   confirmPassword.value = ''
   aceitaTermos.value = false
 
-  empresaTouched.value = false
   nomeTouched.value = false
   emailTouched.value = false
+  telefoneTouched.value = false
   passwordTouched.value = false
   confirmTouched.value = false
   termosTouched.value = false
 }
 
 const handleSubmit = async () => {
-  // Marca todos os campos como "tocados" para mostrar erros se houver
-  empresaTouched.value = true
   nomeTouched.value = true
   emailTouched.value = true
+  telefoneTouched.value = true
   passwordTouched.value = true
   confirmTouched.value = true
   termosTouched.value = true
@@ -198,13 +213,14 @@ const handleSubmit = async () => {
 
   try {
     await store.dispatch('register', {
-      nomeEmpresa: empresa.value.trim(),
       nomeProprio: nome.value.trim(),
       email: email.value.trim(),
+      telefone: telefone.value.trim() || null,
+      cargo: cargo.value,
       palavraPasse: password.value.trim()
     })
 
-    toast('Conta criada com sucesso! Bem-vindo à Alinifacture.', {
+    toast('Utilizador registado com sucesso!', {
       theme: "colored",
       position: "top-right",
       autoClose: 2500,
@@ -212,11 +228,11 @@ const handleSubmit = async () => {
     })
 
     setTimeout(() => {
-       router.push('/dashboard')
+      router.push('/dashboard')
     }, 2500)
   } catch (error) {
     resetForm()
-    toast(error?.response?.data?.message || 'Erro ao criar conta.', {
+    toast(error?.response?.data?.message || 'Erro ao registar utilizador.', {
       theme: "colored",
       position: "top-right",
       autoClose: 2500,

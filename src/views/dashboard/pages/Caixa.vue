@@ -91,9 +91,12 @@
                 </span>
               </td>
               <td class="text-right whitespace-nowrap" @click.stop>
-                <button v-if="proximosStatus(pedido.status)[0]" class="btn-icon btn-ok"
-                  :title="'Avançar para ' + statusLabel(proximosStatus(pedido.status)[0])"
-                  @click="avancarStatus(pedido)">→</button>
+                <button v-for="prox in proximosStatus(pedido.status)" :key="prox" class="btn-icon"
+                  :class="iconClasseStatus(prox)" :title="'Marcar como ' + statusLabel(prox)"
+                  @click="pedirConfirmacaoStatus(pedido, prox)">
+                  {{ iconePorStatus(prox) }}
+                </button>
+                <button class="btn-icon" title="Gerar Factura/Recibo (PDF)" @click="gerarFacturaPedido(pedido)">🧾</button>
                 <button class="btn-icon" title="Detalhes" @click="abrirDetalhes(pedido)">≡</button>
               </td>
             </tr>
@@ -355,6 +358,44 @@
       </div>
     </div>
 
+    <!-- Modal Confirmar Mudança de Status -->
+    <div class="modal fade" id="confirmarStatusModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content ledger-modal">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirmar mudança de status</h5>
+            <button type="button" class="btn-close" @click="fecharModal('confirmarStatusModal')"></button>
+          </div>
+          <div class="modal-body" v-if="confirmacaoStatus.pedido">
+            <p class="text-sm text-ink">
+              Tem certeza que deseja mudar o pedido <strong class="num">{{ confirmacaoStatus.pedido.numeroPedido }}</strong> de
+            </p>
+            <div class="flex items-center gap-2 my-3">
+              <span class="status-badge" :class="'badge-' + confirmacaoStatus.pedido.status">
+                <span class="status-dot"></span>{{ statusLabel(confirmacaoStatus.pedido.status) }}
+              </span>
+              <span class="text-stone-400">→</span>
+              <span class="status-badge" :class="'badge-' + confirmacaoStatus.novoStatus">
+                <span class="status-dot"></span>{{ statusLabel(confirmacaoStatus.novoStatus) }}
+              </span>
+            </div>
+
+            <div v-if="confirmacaoStatus.novoStatus === 'cancelado'">
+              <label class="ledger-label">Motivo do cancelamento (opcional)</label>
+              <textarea class="ledger-input" rows="2" v-model="observacaoStatus"
+                placeholder="Ex: Cliente desistiu, pedido duplicado..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-ghost" @click="fecharModal('confirmarStatusModal')">Cancelar</button>
+            <button type="button" class="btn-primary" :disabled="confirmandoStatus" @click="confirmarMudancaStatus">
+              {{ confirmandoStatus ? 'Atualizando...' : 'Confirmar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Detalhes / Status -->
     <div class="modal fade" id="detalhesPedidoModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg">
@@ -366,15 +407,15 @@
             <button type="button" class="btn-close" @click="fecharModal('detalhesPedidoModal')"></button>
           </div>
           <div class="modal-body">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
               <span class="status-badge lg" :class="'badge-' + pedidoAtivo.status">
                 <span class="status-dot"></span>
                 {{ statusLabel(pedidoAtivo.status) }}
               </span>
 
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-wrap">
                 <button v-for="prox in proximosStatus(pedidoAtivo.status)" :key="prox" class="btn-ghost"
-                  @click="mudarStatus(pedidoAtivo, prox)">
+                  @click="pedirConfirmacaoStatus(pedidoAtivo, prox)">
                   {{ prox === 'cancelado' ? 'Cancelar' : 'Marcar como ' + statusLabel(prox) }}
                 </button>
               </div>
@@ -425,6 +466,7 @@
             </div>
           </div>
           <div class="modal-footer">
+            <button type="button" class="btn-ghost" @click="gerarFacturaPedido(pedidoAtivo)">🧾 Gerar Factura/Recibo</button>
             <button type="button" class="btn-ghost" @click="fecharModal('detalhesPedidoModal')">Fechar</button>
           </div>
         </div>
@@ -438,8 +480,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Modal } from 'bootstrap'
 import { useStore } from 'vuex'
 import { toast } from 'vue3-toastify'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import JsBarcode from 'jsbarcode'
+import logoGrafica from '@/assets/fac1.png'
 
 const store = useStore()
+
+// Dados fiscais da gráfica, usados na factura/recibo gerado em PDF.
+const NOME_GRAFICA = 'Grafica do Leste'
+const NIF_GRAFICA = '5112158212'
 
 const STATUS_LABELS = {
   pendente: 'Pendente',
@@ -456,6 +506,10 @@ const TRANSICOES = {
   entregue: [],
   cancelado: [],
 }
+
+// Ícone e cor de destaque de cada botão de status na tabela.
+const ICONES_STATUS = { pendente: '↺', em_execucao: '▶', pronto: '✓', entregue: '✔', cancelado: '✕' }
+const CLASSES_STATUS = { pendente: '', em_execucao: 'btn-blue', pronto: 'btn-amber', entregue: 'btn-ok', cancelado: 'btn-rule' }
 
 const abas = [
   { valor: '', label: 'Todos' },
@@ -515,8 +569,9 @@ const diasUteisEntre = (inicio, fimStr) => {
 }
 
 const statusLabel = (s) => STATUS_LABELS[s] || s
-// Só mostra a transição "de avanço" no botão rápido da tabela; as demais (voltar/cancelar) ficam no modal de detalhes.
 const proximosStatus = (status) => TRANSICOES[status] || []
+const iconePorStatus = (status) => ICONES_STATUS[status] || '•'
+const iconClasseStatus = (status) => CLASSES_STATUS[status] || ''
 
 const filtros = ref({ status: '', busca: '', page: 1, limit: 10 })
 
@@ -735,7 +790,7 @@ const salvarPedido = async () => {
   }
 }
 
-// --- Detalhes / status ---
+// --- Detalhes ---
 const pedidoAtivo = ref(null)
 
 const abrirDetalhes = async (pedidoResumido) => {
@@ -747,24 +802,189 @@ const abrirDetalhes = async (pedidoResumido) => {
   }
 }
 
-const mudarStatus = async (pedido, novoStatus) => {
-  try {
-    pedidoAtivo.value = await store.dispatch('atualizarStatusPedido', { id: pedido._id, status: novoStatus })
-    toast(`Pedido marcado como "${statusLabel(novoStatus)}"`, { type: 'success', autoClose: 2500 })
-    await Promise.all([carregarPedidos(), carregarResumo()])
-  } catch (err) {
-    toast(err.response?.data?.message || 'Erro ao atualizar status', { type: 'error', autoClose: 2500 })
-  }
+// --- Mudança de status, agora sempre com confirmação prévia ---
+const confirmacaoStatus = ref({ pedido: null, novoStatus: null })
+const confirmandoStatus = ref(false)
+const observacaoStatus = ref('')
+
+const pedirConfirmacaoStatus = (pedido, novoStatus) => {
+  confirmacaoStatus.value = { pedido, novoStatus }
+  observacaoStatus.value = ''
+  new Modal(document.getElementById('confirmarStatusModal')).show()
 }
 
-// Botão rápido na tabela: avança sempre para o PRIMEIRO status da lista de transições (o "avanço natural").
-const avancarStatus = (pedido) => {
-  const proximo = proximosStatus(pedido.status)[0]
-  if (proximo) mudarStatus(pedido, proximo)
+const mudarStatus = async (pedido, novoStatus, observacao) => {
+  const atualizado = await store.dispatch('atualizarStatusPedido', { id: pedido._id, status: novoStatus, observacao })
+  if (pedidoAtivo.value?._id === pedido._id) pedidoAtivo.value = atualizado
+  toast(`Pedido marcado como "${statusLabel(novoStatus)}"`, { type: 'success', autoClose: 2500 })
+  await Promise.all([carregarPedidos(), carregarResumo()])
+}
+
+const confirmarMudancaStatus = async () => {
+  const { pedido, novoStatus } = confirmacaoStatus.value
+  if (!pedido || !novoStatus) return
+
+  confirmandoStatus.value = true
+  try {
+    await mudarStatus(pedido, novoStatus, observacaoStatus.value?.trim() || undefined)
+    fecharModal('confirmarStatusModal')
+  } catch (err) {
+    toast(err.response?.data?.message || 'Erro ao atualizar status', { type: 'error', autoClose: 2500 })
+  } finally {
+    confirmandoStatus.value = false
+  }
 }
 
 const formatarData = (d) => new Date(d).toLocaleString('pt-PT')
 const formatarDataCurta = (d) => (d ? new Date(d).toLocaleDateString('pt-PT') : '—')
+
+// --- Geração de Factura/Recibo em PDF, com código de barras do Nº Pedido ---
+const gerarFacturaPedido = async (pedidoResumido) => {
+  try {
+    // Se já veio com especificações carregadas (ex: já está aberto em Detalhes), não busca de novo.
+    const pedido = pedidoResumido.especificacoes ? pedidoResumido : await store.dispatch('getPedido', pedidoResumido._id)
+    montarPDFFactura(pedido)
+  } catch (err) {
+    toast('Não foi possível gerar a factura deste pedido', { type: 'error', autoClose: 2500 })
+  }
+}
+
+const montarPDFFactura = (pedido) => {
+  // Código de barras (CODE128) com o número do pedido, desenhado num canvas oculto
+  const canvasBarcode = document.createElement('canvas')
+  JsBarcode(canvasBarcode, pedido.numeroPedido, {
+    format: 'CODE128',
+    displayValue: true,
+    fontSize: 13,
+    height: 38,
+    margin: 0,
+  })
+  const barcodeDataUrl = canvasBarcode.toDataURL('image/png')
+
+  // Formato vertical de recibo físico (80mm de largura, altura generosa)
+  const LARGURA = 80
+  const ALTURA = 200
+  const M = 5 // margem
+  const CENTRO = LARGURA / 2
+  const DIREITA = LARGURA - M
+
+  const doc = new jsPDF({ unit: 'mm', format: [LARGURA, ALTURA], orientation: 'portrait' })
+  const totalPedido = pedido.valorTotal ?? (Number(pedido.precoUnitario || 0) * Number(pedido.quantidade || 0))
+
+  let y = 6
+
+  // Logotipo da gráfica (centrado, mantém proporção)
+  try {
+    const props = doc.getImageProperties(logoGrafica)
+    const logoW = 30
+    const logoH = (props.height * logoW) / props.width
+    doc.addImage(logoGrafica, 'PNG', CENTRO - logoW / 2, y, logoW, logoH)
+    y += logoH + 4
+  } catch (e) {
+    console.warn('Não foi possível carregar o logotipo:', e)
+  }
+
+  // Cabeçalho — identificação da gráfica
+  doc.setTextColor(0, 0, 0)
+  doc.setFontSize(11)
+  doc.setFont(undefined, 'bold')
+  doc.text(NOME_GRAFICA, CENTRO, y, { align: 'center' })
+  y += 4.5
+  doc.setFontSize(8)
+  doc.setFont(undefined, 'normal')
+  doc.text(`NIF: ${NIF_GRAFICA}`, CENTRO, y, { align: 'center' })
+  y += 4
+
+  doc.setDrawColor(180, 175, 165)
+  doc.line(M, y, DIREITA, y)
+  y += 5
+
+  // Título e dados do documento
+  doc.setFontSize(10)
+  doc.setFont(undefined, 'bold')
+  doc.text('Factura / Recibo', CENTRO, y, { align: 'center' })
+  y += 5
+  doc.setFontSize(8)
+  doc.setFont(undefined, 'normal')
+  doc.text(`Nº Pedido: ${pedido.numeroPedido}`, M, y)
+  y += 4
+  doc.text(`Data de emissão: ${new Date().toLocaleDateString('pt-PT')}`, M, y)
+  y += 4
+
+  doc.line(M, y, DIREITA, y)
+  y += 5
+
+  // Dados do cliente
+  doc.setFont(undefined, 'bold')
+  doc.text('Cliente', M, y)
+  y += 4
+  doc.setFont(undefined, 'normal')
+  doc.text(doc.splitTextToSize(pedido.cliente?.nome || pedido.nomeCliente || '-', LARGURA - 2 * M), M, y)
+  y += 4
+  if (pedido.cliente?.nif) {
+    doc.text(`NIF: ${pedido.cliente.nif}`, M, y)
+    y += 4
+  }
+  const contacto = pedido.contactoCliente || pedido.cliente?.telefone
+  if (contacto) {
+    doc.text(`Contacto: ${contacto}`, M, y)
+    y += 4
+  }
+
+  doc.line(M, y, DIREITA, y)
+  y += 2
+
+  // Item do pedido (tabela compacta para o formato estreito)
+  autoTable(doc, {
+    startY: y,
+    margin: { left: M, right: M },
+    head: [['Descrição', 'Qtd', 'Total']],
+    body: [[
+      `${pedido.tipoProduto || '-'}\n${pedido.produto?.nome || '-'}\n${pedido.especificacoes || '-'}\nUnit.: ${formatarMoeda(pedido.precoUnitario)}`,
+      String(pedido.quantidade ?? '-'),
+      formatarMoeda(totalPedido),
+    ]],
+    styles: { fontSize: 7, cellPadding: 1.5 },
+    headStyles: { fillColor: [32, 29, 26] },
+    columnStyles: {
+      0: { cellWidth: 38 },
+      1: { cellWidth: 10, halign: 'center' },
+      2: { cellWidth: 22, halign: 'right' },
+    },
+  })
+
+  let finalY = doc.lastAutoTable?.finalY || y + 20
+
+  // Total
+  doc.setFontSize(10)
+  doc.setFont(undefined, 'bold')
+  doc.text(`Total: ${formatarMoeda(totalPedido)}`, DIREITA, finalY + 7, { align: 'right' })
+  finalY += 7
+
+  // Observações
+  if (pedido.observacoes) {
+    doc.setFontSize(8)
+    doc.setFont(undefined, 'normal')
+    doc.text('Observações:', M, finalY + 8)
+    const linhas = doc.splitTextToSize(pedido.observacoes, LARGURA - 2 * M)
+    doc.text(linhas, M, finalY + 12)
+    finalY += 12 + linhas.length * 3.5
+  }
+
+  // Código de barras do Nº Pedido (centrado)
+  const barW = 60
+  const barH = 18
+  const barY = finalY + 8
+  doc.addImage(barcodeDataUrl, 'PNG', CENTRO - barW / 2, barY, barW, barH)
+
+  // Rodapé
+  doc.setFontSize(6.5)
+  doc.setFont(undefined, 'normal')
+  doc.setTextColor(140, 140, 140)
+  doc.text('Documento gerado automaticamente pelo sistema.', CENTRO, barY + barH + 6, { align: 'center' })
+
+  doc.save(`${pedido.numeroPedido}.pdf`)
+}
 </script>
 
 <style scoped>
@@ -963,6 +1183,9 @@ const formatarDataCurta = (d) => (d ? new Date(d).toLocaleDateString('pt-PT') : 
 }
 .btn-icon:hover { border-color: var(--ink); color: var(--ink); }
 .btn-icon.btn-ok:hover { border-color: var(--ok); color: var(--ok); }
+.btn-icon.btn-rule:hover { border-color: var(--rule); color: var(--rule); }
+.btn-icon.btn-blue:hover { border-color: var(--blue); color: var(--blue); }
+.btn-icon.btn-amber:hover { border-color: var(--amber); color: var(--amber); }
 
 .ledger-footer {
   display: flex; align-items: center; justify-content: space-between;

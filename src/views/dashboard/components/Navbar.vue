@@ -1,3 +1,4 @@
+```vue
 <template>
     <nav class="ledger-nav fixed top-0 left-0 right-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -38,7 +39,7 @@
                     <!-- Menu do Usuário -->
                     <div class="relative">
                         <button @click="userMenuOpen = !userMenuOpen" class="user-trigger">
-                            <div class="user-avatar">AD</div>
+                            <div class="user-avatar">{{ iniciais }}</div>
                             <span class="hidden truncate lg:block user-name">
                                 {{ user?.nomeCompleto }}
                             </span>
@@ -50,7 +51,7 @@
 
                         <!-- Dropdown do Usuário -->
                         <div v-if="userMenuOpen" class="user-dropdown">
-                            <a href="#" class="dropdown-item">Perfil</a>
+                            <button @click="abrirPerfil" class="dropdown-item">Perfil</button>
                             <div class="dropdown-rule"></div>
                             <button @click="logout" class="dropdown-item dropdown-item-danger">Sair</button>
                         </div>
@@ -83,11 +84,67 @@
                 </router-link>
             </div>
         </div>
+
+        <!-- Modal de Perfil -->
+        <Teleport to="body">
+            <Transition name="perfil-fade">
+                <div v-if="perfilOpen" class="perfil-overlay" @click.self="fecharPerfil">
+                    <div class="perfil-modal" role="dialog" aria-modal="true" aria-labelledby="perfil-titulo">
+                        <!-- Cabeçalho -->
+                        <div class="perfil-header">
+                            <p class="perfil-eyebrow">Conta</p>
+                            <button class="perfil-close" @click="fecharPerfil" aria-label="Fechar">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Avatar + nome -->
+                        <div class="perfil-hero">
+                            <img v-if="user?.fotoPerfil" :src="user.fotoPerfil" alt="Foto de perfil"
+                                class="perfil-foto" />
+                            <div v-else class="perfil-avatar">{{ iniciais }}</div>
+                            <h3 id="perfil-titulo" class="perfil-nome">{{ user?.nomeCompleto || '-' }}</h3>
+                            <span class="perfil-badge"
+                                :class="user?.ativo === false ? 'perfil-badge-off' : 'perfil-badge-on'">
+                                {{ user?.ativo === false ? 'Inativo' : 'Ativo' }}
+                            </span>
+                        </div>
+
+                        <!-- Informações -->
+                        <dl class="perfil-lista">
+                            <div class="perfil-linha">
+                                <dt>Email</dt>
+                                <dd>{{ user?.email || '-' }}</dd>
+                            </div>
+                            <div class="perfil-linha">
+                                <dt>Telefone</dt>
+                                <dd>{{ user?.telefone || '-' }}</dd>
+                            </div>
+                            <div class="perfil-linha">
+                                <dt>Cargo</dt>
+                                <dd class="capitalize">{{ user?.cargo || '-' }}</dd>
+                            </div>
+                            <div class="perfil-linha">
+                                <dt>Último acesso</dt>
+                                <dd>{{ formatarData(user?.ultimoLogin) }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="perfil-footer">
+                            <button class="perfil-btn" @click="fecharPerfil">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </nav>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import Cookies from "js-cookie"
@@ -99,6 +156,7 @@ const user = computed(() => store.getters.currentUser)
 
 const mobileMenuOpen = ref(false)
 const userMenuOpen = ref(false)
+const perfilOpen = ref(false)
 
 const sessionId = Cookies.get("session_id")
 
@@ -127,13 +185,40 @@ const menuItems = [
         name: 'Pedidos',
         path: '/dashboard/caixa',
         icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z'
-    },
-    {
-        name: 'Financeiro',
-        path: '/dashboard/financeiro',
-        icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
     }
 ]
+
+// Iniciais do nome (ex.: "João Silva" -> "JS")
+const iniciais = computed(() => {
+    const nome = user.value?.nomeCompleto?.trim()
+    if (!nome) return '??'
+    const partes = nome.split(/\s+/)
+    return ((partes[0]?.[0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase()
+})
+
+const formatarData = (valor) => {
+    if (!valor) return '-'
+    return new Date(valor).toLocaleString('pt-PT', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+    })
+}
+
+const abrirPerfil = () => {
+    userMenuOpen.value = false
+    perfilOpen.value = true
+}
+
+const fecharPerfil = () => {
+    perfilOpen.value = false
+}
+
+// Fecha o modal com a tecla Esc
+const onKeydown = (e) => {
+    if (e.key === 'Escape' && perfilOpen.value) fecharPerfil()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 const logout = async () => {
     await store.dispatch("logout", sessionId)
@@ -325,4 +410,187 @@ const logout = async () => {
   color: var(--rule);
   background: #fdf1f0;
 }
+
+/* Modal de perfil (variáveis redefinidas porque o modal é teletransportado para o body) */
+.perfil-overlay {
+  --ink: #201d1a;
+  --ink-soft: #4a453f;
+  --paper: #faf8f3;
+  --paper-line: #e7e0d3;
+  --rule: #b5433c;
+  --ok: #2f7d53;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(32, 29, 26, 0.5);
+  backdrop-filter: blur(2px);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.perfil-modal {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-top: 3px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(32, 29, 26, 0.25);
+  overflow: hidden;
+}
+
+.perfil-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem 0;
+}
+.perfil-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rule);
+  margin: 0;
+}
+.perfil-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  transition: background 0.15s, color 0.15s;
+}
+.perfil-close:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.perfil-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-bottom: 1px dashed var(--paper-line);
+}
+.perfil-avatar,
+.perfil-foto {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+}
+.perfil-avatar {
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 1.4rem;
+}
+.perfil-foto {
+  object-fit: cover;
+  border: 2px solid var(--paper-line);
+}
+.perfil-nome {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin: 0;
+  text-align: center;
+}
+.perfil-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+.perfil-badge-on {
+  color: var(--ok);
+  background: #eaf5ef;
+}
+.perfil-badge-off {
+  color: var(--rule);
+  background: #fdf1f0;
+}
+
+.perfil-lista {
+  margin: 0;
+  padding: 0.5rem 1.25rem;
+}
+.perfil-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--paper-line);
+}
+.perfil-linha:last-child {
+  border-bottom: none;
+}
+.perfil-linha dt {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.perfil-linha dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: right;
+  word-break: break-word;
+}
+
+.perfil-footer {
+  padding: 0.75rem 1.25rem 1.1rem;
+  background: var(--paper);
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  justify-content: flex-end;
+}
+.perfil-btn {
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+.perfil-btn:hover {
+  opacity: 0.85;
+}
+
+/* Animação */
+.perfil-fade-enter-active,
+.perfil-fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.perfil-fade-enter-active .perfil-modal,
+.perfil-fade-leave-active .perfil-modal {
+  transition: transform 0.18s ease;
+}
+.perfil-fade-enter-from,
+.perfil-fade-leave-to {
+  opacity: 0;
+}
+.perfil-fade-enter-from .perfil-modal,
+.perfil-fade-leave-to .perfil-modal {
+  transform: translateY(10px) scale(0.98);
+}
 </style>
+```
