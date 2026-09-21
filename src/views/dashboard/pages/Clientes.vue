@@ -35,10 +35,17 @@
         <p class="stat-value">{{ resumo.novosEsteMes }}</p>
       </div>
     </div>
+    <!-- Abas de status -->
+    <div class="tabs-bar">
+      <button v-for="aba in abas" :key="aba.valor" class="tab-btn" :class="{ active: filtros.status === aba.valor }"
+        @click="filtros.status = aba.valor">
+        {{ aba.label }}
+        <span v-if="resumo && resumo[aba.chave] !== undefined" class="tab-count">
+          {{ resumo[aba.chave] }}
+        </span>
+      </button>
 
-    <!-- Filtros -->
-    <div class="filtros-bar">
-      <div class="relative flex-1 min-w-[240px]">
+      <div class="relative flex-1 min-w-[240px] ml-auto">
         <input type="text" v-model="filtros.busca" placeholder="Buscar por nome, email, telefone ou NIF..."
           class="ledger-input pl-9" />
         <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,12 +53,6 @@
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
-
-      <select v-model="filtros.status" class="ledger-input w-auto">
-        <option value="">Todos os status</option>
-        <option value="ativo">Ativos</option>
-        <option value="inativo">Inativos</option>
-      </select>
 
       <button v-if="filtrosAtivos" class="toggle-pill active" @click="limparFiltros">
         <span class="dot dot-rule"></span>
@@ -91,7 +92,8 @@
             <tr v-for="cliente in clientesListados" :key="cliente._id">
               <td>
                 <div class="font-medium text-ink">{{ cliente.nome }}</div>
-                <div class="text-xs text-stone-500 truncate max-w-[180px]">{{ cliente.observacoes || 'Sem observações' }}</div>
+                <div class="text-xs text-stone-500 truncate max-w-[180px]">{{ cliente.observacoes || 'Sem observações'
+                  }}</div>
               </td>
               <td class="text-stone-500">{{ cliente.email || '—' }}</td>
               <td class="text-stone-500 num">{{ cliente.telefone || '—' }}</td>
@@ -152,7 +154,8 @@
 
                 <div class="col-md-6">
                   <label class="ledger-label">Email</label>
-                  <input type="email" class="ledger-input" v-model="form.email" :class="{ 'input-invalid': errors.email }" />
+                  <input type="email" class="ledger-input" v-model="form.email"
+                    :class="{ 'input-invalid': errors.email }" />
                   <div class="error-text" v-if="errors.email">{{ errors.email }}</div>
                 </div>
 
@@ -239,7 +242,8 @@
             <p class="text-rule mt-2 mb-0">Esta ação não pode ser desfeita.</p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn-ghost" @click="fecharModal('confirmarExclusaoClienteModal')">Cancelar</button>
+            <button type="button" class="btn-ghost"
+              @click="fecharModal('confirmarExclusaoClienteModal')">Cancelar</button>
             <button type="button" class="btn-danger" @click="excluirCliente" :disabled="excluindo">
               {{ excluindo ? 'Excluindo...' : 'Confirmar Exclusão' }}
             </button>
@@ -282,6 +286,12 @@ const form = ref({
   observacoes: '',
   ativo: true
 })
+
+const abas = [
+  { valor: '', label: 'Todos', chave: 'total' },
+  { valor: 'ativo', label: 'Ativos', chave: 'totalAtivos' },
+  { valor: 'inativo', label: 'Inativos', chave: 'totalInativos' },
+]
 
 const errors = ref({})
 const salvando = ref(false)
@@ -622,9 +632,17 @@ const gerarPDFClientes = () => {
   margin-top: 0.15rem;
 }
 
-.text-ink { color: var(--ink); }
-.text-rule { color: var(--rule); }
-.text-ok { color: var(--ok); }
+.text-ink {
+  color: var(--ink);
+}
+
+.text-rule {
+  color: var(--rule);
+}
+
+.text-ok {
+  color: var(--ok);
+}
 
 .num {
   font-family: 'IBM Plex Mono', monospace;
@@ -640,25 +658,71 @@ const gerarPDFClientes = () => {
   border: 1px solid var(--paper-line);
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
 
-.stat-tab { position: absolute; top: 0; left: 0; width: 100%; height: 4px; }
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
 
-.stat-blue { background: #eaf1ff; border-color: #c7dbff; }
-.stat-blue .stat-tab { background: #2563eb; }
-.stat-blue .stat-value { color: #1d4ed8; }
+.stat-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
 
-.stat-rose { background: #fff0f1; border-color: #ffd0d4; }
-.stat-rose .stat-tab { background: #e11d48; }
-.stat-rose .stat-value { color: #be123c; }
+.stat-blue {
+  background: #eaf1ff;
+  border-color: #c7dbff;
+}
 
-.stat-emerald { background: #ecfdf5; border-color: #bdf0d6; }
-.stat-emerald .stat-tab { background: #059669; }
-.stat-emerald .stat-value { color: #047857; }
+.stat-blue .stat-tab {
+  background: #2563eb;
+}
 
-.stat-amber { background: #fff8e8; border-color: #fbe2a6; }
-.stat-amber .stat-tab { background: #d97706; }
-.stat-amber .stat-value { color: #b45309; }
+.stat-blue .stat-value {
+  color: #1d4ed8;
+}
+
+.stat-rose {
+  background: #fff0f1;
+  border-color: #ffd0d4;
+}
+
+.stat-rose .stat-tab {
+  background: #e11d48;
+}
+
+.stat-rose .stat-value {
+  color: #be123c;
+}
+
+.stat-emerald {
+  background: #ecfdf5;
+  border-color: #bdf0d6;
+}
+
+.stat-emerald .stat-tab {
+  background: #059669;
+}
+
+.stat-emerald .stat-value {
+  color: #047857;
+}
+
+.stat-amber {
+  background: #fff8e8;
+  border-color: #fbe2a6;
+}
+
+.stat-amber .stat-tab {
+  background: #d97706;
+}
+
+.stat-amber .stat-value {
+  color: #b45309;
+}
 
 .stat-label {
   font-size: 0.72rem;
@@ -695,8 +759,14 @@ const gerarPDFClientes = () => {
   outline: none;
   transition: border-color 0.15s;
 }
-.ledger-input:focus { border-color: var(--ink); }
-.ledger-input.input-invalid { border-color: var(--rule); }
+
+.ledger-input:focus {
+  border-color: var(--ink);
+}
+
+.ledger-input.input-invalid {
+  border-color: var(--rule);
+}
 
 .search-icon {
   position: absolute;
@@ -735,15 +805,26 @@ const gerarPDFClientes = () => {
   color: var(--ink-soft);
   transition: all 0.15s;
 }
+
 .toggle-pill.active {
   border-color: var(--rule);
   color: var(--rule);
   background: #fdf1f0;
 }
 
-.dot { width: 8px; height: 8px; border-radius: 50%; }
-.dot-rule { background: var(--rule); }
-.dot-ok { background: var(--ok); }
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-rule {
+  background: var(--rule);
+}
+
+.dot-ok {
+  background: var(--ok);
+}
 
 /* Painel/tabela em estilo caderno pautado */
 .ledger-panel {
@@ -780,7 +861,9 @@ const gerarPDFClientes = () => {
   border-left: 3px solid var(--rule);
 }
 
-.ledger-table tbody tr:hover { background: #fbfaf6; }
+.ledger-table tbody tr:hover {
+  background: #fbfaf6;
+}
 
 .status-dot {
   display: inline-block;
@@ -804,8 +887,16 @@ const gerarPDFClientes = () => {
   font-size: 0.85rem;
   transition: all 0.15s;
 }
-.btn-icon:hover { border-color: var(--ink); color: var(--ink); }
-.btn-icon.btn-rule:hover { border-color: var(--rule); color: var(--rule); }
+
+.btn-icon:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-icon.btn-rule:hover {
+  border-color: var(--rule);
+  color: var(--rule);
+}
 
 .ledger-footer {
   display: flex;
@@ -825,8 +916,16 @@ const gerarPDFClientes = () => {
   background: #fff;
   font-size: 0.8rem;
 }
-.page-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-.page-btn:disabled { opacity: 0.4; }
+
+.page-btn.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+}
 
 /* Botões */
 .btn-primary {
@@ -838,7 +937,10 @@ const gerarPDFClientes = () => {
   font-weight: 600;
   border: none;
 }
-.btn-primary:disabled { opacity: 0.6; }
+
+.btn-primary:disabled {
+  opacity: 0.6;
+}
 
 .btn-danger {
   background: var(--rule);
@@ -849,7 +951,10 @@ const gerarPDFClientes = () => {
   font-weight: 600;
   border: none;
 }
-.btn-danger:disabled { opacity: 0.6; }
+
+.btn-danger:disabled {
+  opacity: 0.6;
+}
 
 .btn-ghost {
   background: #fff;
@@ -860,15 +965,67 @@ const gerarPDFClientes = () => {
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
 }
-.btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
-.btn-ghost:disabled { opacity: 0.5; }
+
+.btn-ghost:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+}
 
 .nif-group {
   display: flex;
   gap: 0.5rem;
 }
-.nif-group .ledger-input { flex: 1; }
-.nif-group .btn-ghost { white-space: nowrap; }
+
+.nif-group .ledger-input {
+  flex: 1;
+}
+
+.tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  transition: all 0.15s;
+}
+
+.tab-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.tab-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+
+.tab-btn.active .tab-count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.nif-group .btn-ghost {
+  white-space: nowrap;
+}
 
 /* Switch estilizado */
 .switch-label {
@@ -879,7 +1036,14 @@ const gerarPDFClientes = () => {
   color: var(--ink-soft);
   cursor: pointer;
 }
-.switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .switch-track {
   position: relative;
   width: 38px;
@@ -889,6 +1053,7 @@ const gerarPDFClientes = () => {
   transition: background 0.2s ease;
   flex-shrink: 0;
 }
+
 .switch-thumb {
   position: absolute;
   top: 2px;
@@ -898,16 +1063,35 @@ const gerarPDFClientes = () => {
   background: #fff;
   border-radius: 50%;
   transition: transform 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
-.switch-input:checked + .switch-track { background: var(--ink); }
-.switch-input:checked + .switch-track .switch-thumb { transform: translateX(16px); }
+
+.switch-input:checked+.switch-track {
+  background: var(--ink);
+}
+
+.switch-input:checked+.switch-track .switch-thumb {
+  transform: translateX(16px);
+}
 
 /* Modais */
-.ledger-modal { border-radius: 12px; border: none; }
+.ledger-modal {
+  border-radius: 12px;
+  border: none;
+}
+
 .ledger-modal .modal-header,
-.ledger-modal .modal-footer { border-color: var(--paper-line); padding: 1.1rem 1.4rem; }
-.ledger-modal .modal-body { padding: 1.4rem; max-height: 70vh; overflow-y: auto; }
+.ledger-modal .modal-footer {
+  border-color: var(--paper-line);
+  padding: 1.1rem 1.4rem;
+}
+
+.ledger-modal .modal-body {
+  padding: 1.4rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
 .ledger-modal .modal-title {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -922,5 +1106,10 @@ const gerarPDFClientes = () => {
   margin: 0 auto;
   animation: spin 0.8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

@@ -412,6 +412,7 @@ export default {
 
         async atualizarPedido({ commit }, { id, payload }) {
             try {
+                console.log(payload)
                 const res = await api.put(`/pedidos/${id}`, payload)
                 return res.data.pedido
             } catch (err) {

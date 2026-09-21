@@ -284,7 +284,12 @@ const tituloMovimento = computed(() => ({
 const iconePorTipo = (tipo) => ({ entrada: '↑', saida: '↓', ajuste: '✎' }[tipo] || '•')
 const iconeMovimento = computed(() => iconePorTipo(tipoMovimento.value))
 
-const formatarMoeda = (valor) => (valor === undefined || valor === null ? '—' : `${Number(valor).toFixed(2)} Kz`)
+const formatarMoeda = (v) =>
+  `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
+  
 const formatarData = (data) => new Date(data).toLocaleString('pt-PT')
 
 const carregarNiveis = async (resetPage = false) => {

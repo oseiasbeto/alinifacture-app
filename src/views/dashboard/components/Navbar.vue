@@ -1,69 +1,86 @@
-```vue
 <template>
     <nav class="ledger-nav fixed top-0 left-0 right-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo + Eyebrow -->
                 <div class="flex items-center gap-3">
-                    <img class="w-[56px]" src="../../../assets/logo.png" />
-                    <div class="hidden sm:block leading-tight">
+                    <img class="w-[56px] object-contain" src="../../../assets/logo.png" alt="Gráfica do Leste" />
+                    <div class="hidden sm:block brand-text">
                         <p class="nav-eyebrow">Grafica do Leste</p>
                         <p class="nav-sub">Painel de Gestão</p>
                     </div>
                 </div>
 
                 <!-- Menu Desktop -->
-                <div class="hidden md:flex items-center gap-1">
+                <div class="hidden lg:flex items-stretch gap-1 h-16">
                     <router-link v-for="item in menuItems" :key="item.name" :to="item.path" :class="[
                         'nav-link',
                         route.path === item.path ? 'nav-link-active' : ''
                     ]">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                            <path v-for="(d, i) in item.icon" :key="i" :d="d" />
                         </svg>
                         <span>{{ item.name }}</span>
                     </router-link>
                 </div>
 
                 <!-- Lado Direito -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3">
                     <!-- Notificações -->
-                    <button class="icon-btn hidden sm:flex">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    <button class="icon-btn hidden sm:flex" aria-label="Notificações">
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                            <path v-for="(d, i) in icons.bell" :key="i" :d="d" />
                         </svg>
                         <span class="notif-dot"></span>
                     </button>
 
+                    <span class="nav-divider hidden sm:block" aria-hidden="true"></span>
+
                     <!-- Menu do Usuário -->
                     <div class="relative">
-                        <button @click="userMenuOpen = !userMenuOpen" class="user-trigger">
-                            <div class="user-avatar">{{ iniciais }}</div>
-                            <span class="hidden truncate lg:block user-name">
-                                {{ user?.nomeCompleto }}
+                        <button @click="userMenuOpen = !userMenuOpen" class="user-trigger" aria-haspopup="menu"
+                            :aria-expanded="userMenuOpen">
+                            <span class="user-avatar">{{ iniciais }}</span>
+                            <span class="user-text hidden lg:flex flex-col">
+                                <span class="user-name truncate">{{ user?.nomeCompleto }}</span>
+                                <span v-if="user?.cargo" class="user-role truncate">{{ user.cargo }}</span>
                             </span>
-                            <svg class="h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M19 9l-7 7-7-7" />
+                            <svg class="ico chev" :class="{ 'chev-open': userMenuOpen }" viewBox="0 0 24 24"
+                                aria-hidden="true">
+                                <path v-for="(d, i) in icons.chevron" :key="i" :d="d" />
                             </svg>
                         </button>
 
                         <!-- Dropdown do Usuário -->
-                        <div v-if="userMenuOpen" class="user-dropdown">
-                            <button @click="abrirPerfil" class="dropdown-item">Perfil</button>
-                            <div class="dropdown-rule"></div>
-                            <button @click="logout" class="dropdown-item dropdown-item-danger">Sair</button>
-                        </div>
+                        <Transition name="pop">
+                            <div v-if="userMenuOpen" class="user-dropdown" role="menu">
+                                <div class="dropdown-head">
+                                    <p class="dropdown-name">{{ user?.nomeCompleto || '-' }}</p>
+                                    <p class="dropdown-mail">{{ user?.email || '-' }}</p>
+                                </div>
+                                <div class="dropdown-rule"></div>
+                                <button @click="abrirPerfil" class="dropdown-item" role="menuitem">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.user" :key="i" :d="d" />
+                                    </svg>
+                                    <span>Perfil</span>
+                                </button>
+                                <div class="dropdown-rule"></div>
+                                <button @click="logout" class="dropdown-item dropdown-item-danger" role="menuitem">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.logout" :key="i" :d="d" />
+                                    </svg>
+                                    <span>Sair</span>
+                                </button>
+                            </div>
+                        </Transition>
                     </div>
 
                     <!-- Botão Menu Mobile -->
-                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="icon-btn lg:hidden">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path v-if="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                            <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M6 18L18 6M6 6l12 12" />
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="icon-btn flex lg:hidden"
+                        :aria-label="mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'" :aria-expanded="mobileMenuOpen">
+                        <svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path v-for="(d, i) in (mobileMenuOpen ? icons.close : icons.menu)" :key="i" :d="d" />
                         </svg>
                     </button>
                 </div>
@@ -71,19 +88,21 @@
         </div>
 
         <!-- Menu Mobile -->
-        <div v-if="mobileMenuOpen" class="mobile-menu md:hidden">
-            <div class="px-4 py-3 space-y-1">
-                <router-link v-for="item in menuItems" :key="item.name" :to="item.path" :class="[
-                    'mobile-link',
-                    route.path === item.path ? 'mobile-link-active' : ''
-                ]" @click="mobileMenuOpen = false">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
-                    </svg>
-                    <span>{{ item.name }}</span>
-                </router-link>
+        <Transition name="slide">
+            <div v-if="mobileMenuOpen" class="mobile-menu lg:hidden">
+                <div class="px-4 py-3 space-y-1">
+                    <router-link v-for="item in menuItems" :key="item.name" :to="item.path" :class="[
+                        'mobile-link',
+                        route.path === item.path ? 'mobile-link-active' : ''
+                    ]" @click="mobileMenuOpen = false">
+                        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                            <path v-for="(d, i) in item.icon" :key="i" :d="d" />
+                        </svg>
+                        <span>{{ item.name }}</span>
+                    </router-link>
+                </div>
             </div>
-        </div>
+        </Transition>
 
         <!-- Modal de Perfil -->
         <Teleport to="body">
@@ -94,9 +113,8 @@
                         <div class="perfil-header">
                             <p class="perfil-eyebrow">Conta</p>
                             <button class="perfil-close" @click="fecharPerfil" aria-label="Fechar">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12" />
+                                <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path v-for="(d, i) in icons.close" :key="i" :d="d" />
                                 </svg>
                             </button>
                         </div>
@@ -109,6 +127,7 @@
                             <h3 id="perfil-titulo" class="perfil-nome">{{ user?.nomeCompleto || '-' }}</h3>
                             <span class="perfil-badge"
                                 :class="user?.ativo === false ? 'perfil-badge-off' : 'perfil-badge-on'">
+                                <span class="perfil-badge-dot"></span>
                                 {{ user?.ativo === false ? 'Inativo' : 'Ativo' }}
                             </span>
                         </div>
@@ -116,20 +135,48 @@
                         <!-- Informações -->
                         <dl class="perfil-lista">
                             <div class="perfil-linha">
-                                <dt>Email</dt>
-                                <dd>{{ user?.email || '-' }}</dd>
+                                <span class="perfil-ico">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.mail" :key="i" :d="d" />
+                                    </svg>
+                                </span>
+                                <div class="perfil-info">
+                                    <dt>Email</dt>
+                                    <dd>{{ user?.email || '-' }}</dd>
+                                </div>
                             </div>
                             <div class="perfil-linha">
-                                <dt>Telefone</dt>
-                                <dd>{{ user?.telefone || '-' }}</dd>
+                                <span class="perfil-ico">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.phone" :key="i" :d="d" />
+                                    </svg>
+                                </span>
+                                <div class="perfil-info">
+                                    <dt>Telefone</dt>
+                                    <dd>{{ user?.telefone || '-' }}</dd>
+                                </div>
                             </div>
                             <div class="perfil-linha">
-                                <dt>Cargo</dt>
-                                <dd class="capitalize">{{ user?.cargo || '-' }}</dd>
+                                <span class="perfil-ico">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.briefcase" :key="i" :d="d" />
+                                    </svg>
+                                </span>
+                                <div class="perfil-info">
+                                    <dt>Cargo</dt>
+                                    <dd class="capitalize">{{ user?.cargo || '-' }}</dd>
+                                </div>
                             </div>
                             <div class="perfil-linha">
-                                <dt>Último acesso</dt>
-                                <dd>{{ formatarData(user?.ultimoLogin) }}</dd>
+                                <span class="perfil-ico">
+                                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path v-for="(d, i) in icons.clock" :key="i" :d="d" />
+                                    </svg>
+                                </span>
+                                <div class="perfil-info">
+                                    <dt>Último acesso</dt>
+                                    <dd>{{ formatarData(user?.ultimoLogin) }}</dd>
+                                </div>
                             </div>
                         </dl>
 
@@ -160,32 +207,79 @@ const perfilOpen = ref(false)
 
 const sessionId = Cookies.get("session_id")
 
+// Ícones (conjunto único, traço de 1.75px, estilo Lucide) — cada ícone é uma lista de paths
+const icons = {
+    dashboard: [
+        'M4 3h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z',
+        'M15 3h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z',
+        'M15 12h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z',
+        'M4 16h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z',
+    ],
+    produtos: [
+        'm7.5 4.27 9 5.15',
+        'M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z',
+        'm3.3 7 8.7 5 8.7-5',
+        'M12 22V12',
+    ],
+    estoque: [
+        'M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z',
+        'M6 18h12',
+        'M6 14h12',
+        'M6 10h12v12H6z',
+    ],
+    clientes: [
+        'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2',
+        'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+        'M22 21v-2a4 4 0 0 0-3-3.87',
+        'M16 3.13a4 4 0 0 1 0 7.75',
+    ],
+    pedidos: [
+        'M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z',
+        'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
+        'M12 11h4',
+        'M12 16h4',
+        'M8 11h.01',
+        'M8 16h.01',
+    ],
+    bell: [
+        'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9',
+        'M10.3 21a1.94 1.94 0 0 0 3.4 0',
+    ],
+    chevron: ['m6 9 6 6 6-6'],
+    menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
+    close: ['M18 6 6 18', 'm6 6 12 12'],
+    user: [
+        'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2',
+        'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+    ],
+    logout: [
+        'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4',
+        'm16 17 5-5-5-5',
+        'M21 12H9',
+    ],
+    mail: [
+        'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+        'm22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7',
+    ],
+    phone: [
+        'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
+    ],
+    briefcase: [
+        'M4 7h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z',
+        'M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2',
+    ],
+    clock: [
+        'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
+        'M12 6v6l4 2',
+    ],
+}
+
 const menuItems = [
-    {
-        name: 'Dashboard',
-        path: '/dashboard',
-        icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
-    },
-    {
-        name: 'Produtos',
-        path: '/dashboard/produtos',
-        icon: 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z'
-    },
-    {
-        name: 'Estoque',
-        path: '/dashboard/estoque',
-        icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6.75 5.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'
-    },
-    {
-        name: 'Clientes',
-        path: '/dashboard/clientes',
-        icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'
-    },
-    {
-        name: 'Pedidos',
-        path: '/dashboard/caixa',
-        icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z'
-    }
+    { name: 'Dashboard', path: '/dashboard', icon: icons.dashboard },
+    { name: 'Produtos', path: '/dashboard/produtos', icon: icons.produtos },
+    { name: 'Estoque', path: '/dashboard/estoque', icon: icons.estoque },
+    { name: 'Clientes', path: '/dashboard/clientes', icon: icons.clientes },
+    { name: 'Pedidos', path: '/dashboard/caixa', icon: icons.pedidos },
 ]
 
 // Iniciais do nome (ex.: "João Silva" -> "JS")
@@ -229,7 +323,7 @@ const logout = async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 .ledger-nav {
   --ink: #201d1a;
@@ -239,11 +333,40 @@ const logout = async () => {
   --rule: #b5433c;
   --ok: #2f7d53;
   font-family: 'Inter', system-ui, sans-serif;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
+  backdrop-filter: saturate(1.4) blur(8px);
   border-bottom: 1px solid var(--paper-line);
   box-shadow: 0 1px 0 var(--rule);
 }
 
+/* Ícones */
+.ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico-lg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Foco visível (teclado) */
+.ledger-nav :is(a, button):focus-visible,
+.perfil-overlay :is(a, button):focus-visible {
+  outline: 2px solid var(--rule);
+  outline-offset: 2px;
+}
+
+/* Marca */
+.brand-text {
+  line-height: 1.15;
+}
 .nav-eyebrow {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.65rem;
@@ -252,57 +375,79 @@ const logout = async () => {
   color: var(--rule);
   margin: 0;
 }
-
 .nav-sub {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
   color: var(--ink);
   margin: 0;
 }
 
-/* Links de navegação - desktop */
+/* Links de navegação - desktop (indicador assenta na régua do rodapé) */
 .nav-link {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  gap: 0.5rem;
+  height: 64px;
+  padding: 0 0.9rem;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--ink-soft);
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s;
+}
+.nav-link::before {
+  content: '';
+  position: absolute;
+  inset: 14px 0;
+  z-index: -1;
+  border-radius: 8px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--rule);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
 }
 .nav-link:hover {
   color: var(--ink);
+}
+.nav-link:hover::before {
   background: var(--paper);
 }
-.nav-link-active {
+.nav-link-active,
+.nav-link-active:hover {
   color: var(--rule);
+}
+.nav-link-active::before,
+.nav-link-active:hover::before {
   background: #fdf1f0;
 }
-.nav-link-active .nav-icon {
-  filter: none;
-}
-
-.nav-icon {
-  width: 17px;
-  height: 17px;
-  flex-shrink: 0;
+.nav-link-active::after {
+  transform: scaleX(1);
 }
 
 /* Botão ícone (notificações / hamburguer) */
 .icon-btn {
   position: relative;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   color: var(--ink-soft);
   border: 1px solid transparent;
-  transition: all 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .icon-btn:hover {
   color: var(--ink);
@@ -312,13 +457,19 @@ const logout = async () => {
 
 .notif-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  height: 7px;
-  width: 7px;
+  top: 8px;
+  right: 9px;
+  height: 8px;
+  width: 8px;
   border-radius: 50%;
   background: var(--rule);
   box-shadow: 0 0 0 2px #fff;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--paper-line);
 }
 
 /* Usuário */
@@ -326,11 +477,22 @@ const logout = async () => {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+  border: 1px solid var(--paper-line);
+  border-radius: 999px;
+  background: #fff;
+  transition: background 0.15s, border-color 0.15s;
+}
+.user-trigger:hover,
+.user-trigger[aria-expanded='true'] {
+  background: var(--paper);
+  border-color: #d8cfbe;
 }
 
 .user-avatar {
   height: 32px;
   width: 32px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--ink);
   color: var(--paper);
@@ -342,32 +504,84 @@ const logout = async () => {
   font-size: 0.75rem;
 }
 
+.user-text {
+  align-items: flex-start;
+  max-width: 150px;
+  min-width: 0;
+  line-height: 1.2;
+  text-align: left;
+}
 .user-name {
-  font-size: 0.85rem;
-  font-weight: 500;
+  max-width: 100%;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--ink);
 }
+.user-role {
+  max-width: 100%;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  text-transform: capitalize;
+}
 
+.chev {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-soft);
+  transition: transform 0.2s ease;
+}
+.chev-open {
+  transform: rotate(180deg);
+}
+
+/* Dropdown */
 .user-dropdown {
   position: absolute;
   right: 0;
-  margin-top: 0.5rem;
-  width: 180px;
+  margin-top: 0.6rem;
+  width: 240px;
   background: #fff;
   border: 1px solid var(--paper-line);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(32, 29, 26, 0.1);
-  padding: 0.35rem 0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(32, 29, 26, 0.14);
+  padding: 0.35rem;
   z-index: 50;
+  transform-origin: top right;
+}
+.dropdown-head {
+  padding: 0.6rem 0.65rem;
+}
+.dropdown-name {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-mail {
+  margin: 0.1rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dropdown-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   width: 100%;
   text-align: left;
-  padding: 0.5rem 1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
   font-size: 0.85rem;
+  font-weight: 500;
   color: var(--ink-soft);
+  transition: background 0.15s, color 0.15s;
 }
 .dropdown-item:hover {
   background: var(--paper);
@@ -378,6 +592,7 @@ const logout = async () => {
 }
 .dropdown-item-danger:hover {
   background: #fdf1f0;
+  color: var(--rule);
 }
 
 .dropdown-rule {
@@ -390,25 +605,39 @@ const logout = async () => {
 .mobile-menu {
   border-top: 1px solid var(--paper-line);
   background: var(--paper);
+  box-shadow: 0 14px 24px -14px rgba(32, 29, 26, 0.2);
 }
 
 .mobile-link {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 8px;
+  gap: 0.7rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--ink-soft);
+  transition: background 0.15s, color 0.15s;
 }
 .mobile-link:hover {
   background: #fff;
   color: var(--ink);
 }
-.mobile-link-active {
+.mobile-link-active,
+.mobile-link-active:hover {
   color: var(--rule);
   background: #fdf1f0;
+}
+.mobile-link-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--rule);
 }
 
 /* Modal de perfil (variáveis redefinidas porque o modal é teletransportado para o body) */
@@ -437,8 +666,8 @@ const logout = async () => {
   background: #fff;
   border: 1px solid var(--paper-line);
   border-top: 3px solid var(--rule);
-  border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(32, 29, 26, 0.25);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(32, 29, 26, 0.28);
   overflow: hidden;
 }
 
@@ -475,15 +704,16 @@ const logout = async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 1.25rem 1.25rem;
+  gap: 0.55rem;
+  padding: 0.75rem 1.25rem 1.35rem;
   border-bottom: 1px dashed var(--paper-line);
 }
 .perfil-avatar,
 .perfil-foto {
-  width: 76px;
-  height: 76px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 5px var(--paper-line);
 }
 .perfil-avatar {
   background: var(--ink);
@@ -493,27 +723,36 @@ const logout = async () => {
   justify-content: center;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
 }
 .perfil-foto {
   object-fit: cover;
-  border: 2px solid var(--paper-line);
 }
 .perfil-nome {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
   color: var(--ink);
-  margin: 0;
+  margin: 0.5rem 0 0;
   text-align: center;
 }
 .perfil-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 0.15rem 0.6rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 999px;
+}
+.perfil-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .perfil-badge-on {
   color: var(--ok);
@@ -530,28 +769,45 @@ const logout = async () => {
 }
 .perfil-linha {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.65rem 0;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0;
   border-bottom: 1px solid var(--paper-line);
 }
 .perfil-linha:last-child {
   border-bottom: none;
 }
-.perfil-linha dt {
+.perfil-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  color: var(--ink-soft);
+}
+.perfil-ico .ico {
+  width: 16px;
+  height: 16px;
+}
+.perfil-info {
+  min-width: 0;
+}
+.perfil-info dt {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
-.perfil-linha dd {
-  margin: 0;
-  font-size: 0.875rem;
+.perfil-info dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--ink);
-  text-align: right;
   word-break: break-word;
 }
 
@@ -563,7 +819,7 @@ const logout = async () => {
   justify-content: flex-end;
 }
 .perfil-btn {
-  padding: 0.5rem 1.1rem;
+  padding: 0.5rem 1.2rem;
   border-radius: 8px;
   background: var(--ink);
   color: var(--paper);
@@ -575,7 +831,27 @@ const logout = async () => {
   opacity: 0.85;
 }
 
-/* Animação */
+/* Animações (respondem a uma ação do utilizador) */
+.pop-enter-active,
+.pop-leave-active {
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .perfil-fade-enter-active,
 .perfil-fade-leave-active {
   transition: opacity 0.18s ease;
@@ -592,5 +868,12 @@ const logout = async () => {
 .perfil-fade-leave-to .perfil-modal {
   transform: translateY(10px) scale(0.98);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-nav *,
+  .perfil-overlay,
+  .perfil-overlay * {
+    transition: none !important;
+  }
+}
 </style>
-```

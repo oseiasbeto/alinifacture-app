@@ -81,7 +81,12 @@
             <tr v-for="pedido in pedidos" :key="pedido._id" class="row-clickable" @click="abrirDetalhes(pedido)">
               <td class="num font-medium text-ink">{{ pedido.numeroPedido }}</td>
               <td>{{ pedido.cliente?.nome || pedido.nomeCliente }}</td>
-              <td class="text-stone-500">{{ pedido.produto?.nome }} / {{ pedido.tipoProduto }}</td>
+              <td class="text-stone-500">
+                {{ pedido.produto?.nome }} / {{ pedido.tipoProduto }}
+                <span v-if="pedido.imagens?.length" class="anexo-badge" title="Tem ilustração">
+                  🖼 {{ pedido.imagens.length }}
+                </span>
+              </td>
               <td class="text-right num">{{ pedido.quantidade }}</td>
               <td class="text-stone-500 whitespace-nowrap">{{ formatarDataCurta(pedido.dataEntregaPrevista) }}</td>
               <td>
@@ -96,6 +101,7 @@
                   @click="pedirConfirmacaoStatus(pedido, prox)">
                   {{ iconePorStatus(prox) }}
                 </button>
+                <button class="btn-icon" title="Adicionar ilustrações" @click="abrirModalImagens(pedido)">📷</button>
                 <button class="btn-icon" title="Gerar Factura/Recibo (PDF)" @click="gerarFacturaPedido(pedido)">🧾</button>
                 <button class="btn-icon" title="Detalhes" @click="abrirDetalhes(pedido)">≡</button>
               </td>
@@ -127,7 +133,7 @@
             <button type="button" class="btn-close" @click="fecharModal('novoPedidoModal')"></button>
           </div>
           <div class="modal-body">
-            <form @submit.prevent="salvarPedido" @keydown.enter.prevent>
+            <form @submit.prevent="salvarPedido" @keydown.enter.prevent @paste="onPaste">
               <div class="row g-3">
                 <div class="col-12">
                   <label class="ledger-label">Cliente <span class="text-rule">*</span></label>
@@ -158,9 +164,31 @@
                   <label class="ledger-label">Serviço <span class="text-rule">*</span></label>
                   <select class="ledger-input" v-model="form.tipoProduto" :class="{ 'input-invalid': errors.tipoProduto }">
                     <option value="">Selecione o serviço</option>
-                    <option v-for="s in servicosDisponiveis" :key="s" :value="s">{{ s }}</option>
+                    <option v-for="s in servicosDisponiveis" :key="s.nome" :value="s.nome">{{ rotuloServico(s) }}</option>
                   </select>
                   <div class="error-text" v-if="errors.tipoProduto">{{ errors.tipoProduto }}</div>
+                </div>
+
+                <!-- Serviço "Outro": nome livre + valor adicional -->
+                <template v-if="ehOutroServico">
+                  <div class="col-md-8">
+                    <label class="ledger-label">Nome do serviço <span class="text-rule">*</span></label>
+                    <input type="text" class="ledger-input" v-model="form.servicoOutro"
+                      placeholder="Escreva o serviço pretendido..."
+                      :class="{ 'input-invalid': errors.servicoOutro }" />
+                    <div class="error-text" v-if="errors.servicoOutro">{{ errors.servicoOutro }}</div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="ledger-label">Valor adicional (por unidade)</label>
+                    <input type="number" min="0" step="any" class="ledger-input num" v-model="form.adicionalOutro"
+                      placeholder="0" :class="{ 'input-invalid': errors.adicionalOutro }" />
+                    <div class="error-text" v-if="errors.adicionalOutro">{{ errors.adicionalOutro }}</div>
+                  </div>
+                </template>
+                <div class="col-12" v-else-if="adicionalServico > 0">
+                  <small class="text-stone-500">
+                    Este serviço acrescenta <strong class="num">{{ formatarMoeda(adicionalServico) }}</strong> por unidade.
+                  </small>
                 </div>
 
                 <div class="col-12">
@@ -171,6 +199,30 @@
                   <div class="error-text" v-if="errors.especificacoes">{{ errors.especificacoes }}</div>
                 </div>
 
+                <!-- Ilustração / referência (enviada para o Cloudinary ao criar o pedido) -->
+                <div class="col-12">
+                  <label class="ledger-label">
+                    Ilustração / referência <span class="text-stone-400">(opcional)</span>
+                  </label>
+                  <label class="dropzone" :class="{ 'dropzone-over': arrastando }"
+                    @dragover.prevent="arrastando = true" @dragleave.prevent="arrastando = false"
+                    @drop.prevent="arrastando = false; onDrop($event)">
+                    <input type="file" accept="image/*" multiple class="hidden" @change="onSelecionarArquivos" />
+                    <span>Arraste as imagens, clique para escolher ou cole (Ctrl+V)</span>
+                    <small>Até {{ MAX_ANEXOS }} imagens, {{ MAX_MB }} MB cada</small>
+                  </label>
+                 
+
+                  <div v-if="anexos.length" class="anexos-grid">
+                    <div v-for="(a, i) in anexos" :key="a.preview" class="anexo-item">
+                      <img :src="a.preview" alt="Pré-visualização" />
+                      <span v-if="a.publicId" class="anexo-ok" title="Enviada">✓</span>
+                      <button type="button" class="anexo-remove" aria-label="Remover imagem"
+                        :disabled="salvando" @click="removerAnexo(i)">✕</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="col-md-4">
                   <label class="ledger-label">Quantidade</label>
                   <input type="number" min="1" class="ledger-input num" v-model="form.quantidade" />
@@ -178,7 +230,10 @@
 
                 <div class="col-md-4">
                   <label class="ledger-label">Preço unitário <span class="text-rule">*</span></label>
-                  <input type="text" class="ledger-input num" :value="formatarMoeda(form.precoUnitario)" disabled />
+                  <input type="text" class="ledger-input num" :value="formatarMoeda(precoUnitarioFinal)" disabled />
+                  <small v-if="adicionalServico > 0" class="text-stone-500 d-block mt-1">
+                    Produto {{ formatarMoeda(form.precoUnitario) }} + serviço {{ formatarMoeda(adicionalServico) }}
+                  </small>
                   <div class="error-text" v-if="errors.precoUnitario">{{ errors.precoUnitario }}</div>
                 </div>
 
@@ -203,7 +258,66 @@
           <div class="modal-footer">
             <button type="button" class="btn-ghost" @click="fecharModal('novoPedidoModal')">Cancelar</button>
             <button type="button" class="btn-primary" :disabled="salvando" @click="salvarPedido">
-              {{ salvando ? 'Salvando...' : 'Criar Pedido' }}
+              {{ salvando ? (enviandoImagens ? 'Enviando imagens...' : 'Salvando...') : 'Criar Pedido' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Adicionar Ilustrações (a um pedido já criado) -->
+    <div class="modal fade" id="imagensPedidoModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content ledger-modal" v-if="pedidoImagens">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Ilustrações do pedido <span class="num">{{ pedidoImagens.numeroPedido }}</span>
+            </h5>
+            <button type="button" class="btn-close" @click="fecharModal('imagensPedidoModal')"></button>
+          </div>
+          <div class="modal-body" @paste="onPasteTardio">
+            <div v-if="imagensExistentes.length" class="anexos-existentes">
+              <p class="form-section-title">Já anexadas ({{ imagensExistentes.length }})</p>
+              <div class="anexos-grid">
+                <div v-for="id in imagensExistentes" :key="id" class="anexo-item">
+                  <a :href="urlImagemGrande(id)" target="_blank" rel="noopener" title="Abrir em tamanho grande">
+                    <img :src="urlMiniatura(id)" alt="Ilustração do pedido" loading="lazy" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div :class="{ 'mt-4': imagensExistentes.length }">
+              <p class="form-section-title">Adicionar novas</p>
+
+              <div v-if="vagasImagens <= 0" class="text-sm text-stone-500">
+                Este pedido já tem o máximo de {{ MAX_ANEXOS }} imagens.
+              </div>
+              <template v-else>
+                <label class="dropzone" :class="{ 'dropzone-over': arrastandoTardio }"
+                  @dragover.prevent="arrastandoTardio = true" @dragleave.prevent="arrastandoTardio = false"
+                  @drop.prevent="arrastandoTardio = false; onDropTardio($event)">
+                  <input type="file" accept="image/*" multiple class="hidden" @change="onSelecionarTardio" />
+                  <span>Arraste as imagens, clique para escolher ou cole (Ctrl+V)</span>
+                  <small>Pode adicionar mais {{ vagasImagens }} {{ vagasImagens === 1 ? 'imagem' : 'imagens' }}, {{ MAX_MB }} MB cada</small>
+                </label>
+
+                <div v-if="anexosTardios.length" class="anexos-grid">
+                  <div v-for="(a, i) in anexosTardios" :key="a.preview" class="anexo-item">
+                    <img :src="a.preview" alt="Pré-visualização" />
+                    <span v-if="a.publicId" class="anexo-ok" title="Enviada">✓</span>
+                    <button type="button" class="anexo-remove" aria-label="Remover imagem"
+                      :disabled="salvandoImagens" @click="removerAnexoTardio(i)">✕</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-ghost" @click="fecharModal('imagensPedidoModal')">Cancelar</button>
+            <button type="button" class="btn-primary" :disabled="salvandoImagens || !anexosTardios.length"
+              @click="salvarImagensTardias">
+              {{ salvandoImagens ? (enviandoTardio ? 'Enviando imagens...' : 'Salvando...') : 'Guardar ilustrações' }}
             </button>
           </div>
         </div>
@@ -452,6 +566,21 @@
               </div>
             </dl>
 
+            <!-- Ilustrações do pedido (para o designer) -->
+            <div v-if="pedidoAtivo.imagens?.length" class="anexos-detalhe">
+              <p class="form-section-title">Ilustrações do pedido</p>
+              <div class="anexos-grid">
+                <div v-for="id in pedidoAtivo.imagens" :key="id" class="anexo-item">
+                  <a :href="urlImagemGrande(id)" target="_blank" rel="noopener" title="Abrir em tamanho grande">
+                    <img :src="urlMiniatura(id)" alt="Ilustração do pedido" loading="lazy" />
+                  </a>
+                  <a :href="urlImagemDownload(id)" class="anexo-download" target="_blank" rel="noopener">
+                    Baixar original
+                  </a>
+                </div>
+              </div>
+            </div>
+
             <div class="historico">
               <p class="form-section-title">Histórico</p>
               <ul>
@@ -466,6 +595,7 @@
             </div>
           </div>
           <div class="modal-footer">
+            <button type="button" class="btn-ghost" @click="abrirModalImagens(pedidoAtivo)">📷 Adicionar ilustrações</button>
             <button type="button" class="btn-ghost" @click="gerarFacturaPedido(pedidoAtivo)">🧾 Gerar Factura/Recibo</button>
             <button type="button" class="btn-ghost" @click="fecharModal('detalhesPedidoModal')">Fechar</button>
           </div>
@@ -476,7 +606,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Modal } from 'bootstrap'
 import { useStore } from 'vuex'
 import { toast } from 'vue3-toastify'
@@ -490,6 +620,10 @@ const store = useStore()
 // Dados fiscais da gráfica, usados na factura/recibo gerado em PDF.
 const NOME_GRAFICA = 'Grafica do Leste'
 const NIF_GRAFICA = '5112158212'
+
+// Cloudinary: upload directo do frontend (preset "unsigned"). Só o public_id é guardado no pedido.
+const CLOUD_NAME = "dxgfptejc"
+const UPLOAD_PRESET = "ml_default"
 
 const STATUS_LABELS = {
   pendente: 'Pendente',
@@ -520,24 +654,33 @@ const abas = [
 ]
 
 // Serviços típicos de uma gráfica — usados no select "Serviço" do Novo Pedido.
+// `precoAdicional` é somado ao preço unitário do produto (por unidade). Todos começam a 0:
+// basta alterar aqui o valor de cada serviço.
+const SERVICO_OUTRO = 'Outro'
 const servicosDisponiveis = [
-  'Timbragem',
-  'Impressão Digital',
-  'Impressão Offset',
-  'Fotocópias',
-  'Encadernação',
-  'Plastificação',
-  'Design Gráfico',
-  'Cartões de Visita',
-  'Convites',
-  'Banners / Faixas',
-  'Flyers / Panfletos',
-  'Carimbos',
-  'Vinil / Autocolantes',
-  'T-shirts Personalizadas',
-  'Placas Sinaléticas',
-  'Outro',
+  { nome: 'Timbragem', precoAdicional: 0 },
+  { nome: 'Impressão Digital', precoAdicional: 0 },
+  { nome: 'Impressão Offset', precoAdicional: 0 },
+  { nome: 'Fotocópias', precoAdicional: 0 },
+  { nome: 'Encadernação', precoAdicional: 0 },
+  { nome: 'Plastificação', precoAdicional: 0 },
+  { nome: 'Design Gráfico', precoAdicional: 0 },
+  { nome: 'Cartões de Visita', precoAdicional: 0 },
+  { nome: 'Convites', precoAdicional: 0 },
+  { nome: 'Banners / Faixas', precoAdicional: 0 },
+  { nome: 'Flyers / Panfletos', precoAdicional: 0 },
+  { nome: 'Carimbos', precoAdicional: 0 },
+  { nome: 'Vinil / Autocolantes', precoAdicional: 0 },
+  { nome: 'T-shirts Personalizadas', precoAdicional: 0 },
+  { nome: 'Placas Sinaléticas', precoAdicional: 0 },
+  { nome: SERVICO_OUTRO, precoAdicional: 0 }, // "Outro": o valor adicional é digitado no formulário
 ]
+
+// Texto de cada opção do select: mostra o adicional quando existir.
+const rotuloServico = (s) =>
+  s.nome !== SERVICO_OUTRO && Number(s.precoAdicional) > 0
+    ? `${s.nome} (+${formatarMoeda(s.precoAdicional)})`
+    : s.nome
 
 const toISODate = (date) => {
   const d = new Date(date)
@@ -612,24 +755,235 @@ const mudarPagina = (n) => {
   carregarPedidos()
 }
 
+// --- Utilitários de modais ---
+const abrirModal = (modalId) => {
+  const el = document.getElementById(modalId)
+  if (el) Modal.getOrCreateInstance(el).show()
+}
+
 const fecharModal = (modalId) => {
   const el = document.getElementById(modalId)
   const instance = el && Modal.getInstance(el)
   if (instance) instance.hide()
 }
 
+// Fecha o modal e só resolve quando a animação terminou (evita dois modais/backdrops sobrepostos).
+// Se o modal não estiver aberto, resolve logo.
+const fecharModalAsync = (modalId) => new Promise((resolve) => {
+  const el = document.getElementById(modalId)
+  const instance = el && Modal.getInstance(el)
+  if (!el || !instance || !el.classList.contains('show')) return resolve()
+  el.addEventListener('hidden.bs.modal', () => resolve(), { once: true })
+  instance.hide()
+})
+
+// --- Imagens do pedido (Cloudinary) ---
+const MAX_ANEXOS = 5
+const MAX_MB = 5
+
+// URLs de entrega a partir do public_id guardado no pedido
+const urlImagem = (publicId, transformacao = 'f_auto,q_auto') =>
+  `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${transformacao}/${publicId}`
+const urlMiniatura = (id) => urlImagem(id, 'c_fill,w_300,h_300,f_auto,q_auto')
+const urlImagemGrande = (id) => urlImagem(id, 'c_limit,w_1600,f_auto,q_auto')
+const urlImagemDownload = (id) => urlImagem(id, 'fl_attachment') // ficheiro original
+
+const enviarParaCloudinary = async (file) => {
+  const dados = new FormData()
+  dados.append('file', file)
+  dados.append('upload_preset', UPLOAD_PRESET)
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST',
+    body: dados,
+  })
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({}))
+    throw new Error(erro.error?.message || 'Falha ao enviar a imagem')
+  }
+  const resultado = await res.json()
+  return resultado.public_id
+}
+
+// Gestor de anexos reutilizável: um para o "Novo Pedido" e outro para o "Adicionar ilustrações" posterior.
+// `limite()` devolve quantas imagens ainda podem ser adicionadas no total.
+const criarGestorAnexos = (limite = () => MAX_ANEXOS) => {
+  const anexos = ref([]) // [{ file, preview, publicId }]
+  const arrastando = ref(false)
+  const enviando = ref(false)
+
+  const adicionar = (lista) => {
+    for (const file of Array.from(lista)) {
+      if (!file.type.startsWith('image/')) {
+        toast(`"${file.name}" não é uma imagem`, { type: 'warning', autoClose: 2500 })
+        continue
+      }
+      if (file.size > MAX_MB * 1024 * 1024) {
+        toast(`"${file.name}" excede ${MAX_MB} MB`, { type: 'warning', autoClose: 2500 })
+        continue
+      }
+      if (anexos.value.length >= limite()) {
+        toast(`Máximo de ${MAX_ANEXOS} imagens por pedido`, { type: 'warning', autoClose: 2500 })
+        break
+      }
+      anexos.value.push({ file, preview: URL.createObjectURL(file), publicId: null })
+    }
+  }
+
+  const onSelecionar = (e) => {
+    adicionar(e.target.files)
+    e.target.value = '' // permite escolher o mesmo ficheiro outra vez
+  }
+  const onDrop = (e) => adicionar(e.dataTransfer?.files || [])
+  const onPaste = (e) => {
+    const files = [...(e.clipboardData?.files || [])]
+    if (files.length) adicionar(files)
+  }
+
+  const remover = (i) => {
+    URL.revokeObjectURL(anexos.value[i].preview)
+    anexos.value.splice(i, 1)
+  }
+
+  const limpar = () => {
+    anexos.value.forEach((a) => URL.revokeObjectURL(a.preview))
+    anexos.value = []
+  }
+
+  // Envia só as imagens que ainda não foram enviadas (assim, uma nova tentativa não repete uploads).
+  const enviarPendentes = async () => {
+    const pendentes = anexos.value.filter((a) => !a.publicId)
+    if (!pendentes.length) return
+    enviando.value = true
+    try {
+      await Promise.all(pendentes.map(async (a) => {
+        a.publicId = await enviarParaCloudinary(a.file)
+      }))
+    } finally {
+      enviando.value = false
+    }
+  }
+
+  return { anexos, arrastando, enviando, onSelecionar, onDrop, onPaste, remover, limpar, enviarPendentes }
+}
+
+// Gestor do formulário "Novo Pedido"
+const {
+  anexos,
+  arrastando,
+  enviando: enviandoImagens,
+  onSelecionar: onSelecionarArquivos,
+  onDrop,
+  onPaste,
+  remover: removerAnexo,
+  limpar: limparAnexos,
+  enviarPendentes: enviarImagensPendentes,
+} = criarGestorAnexos()
+
+// --- Adicionar ilustrações mais tarde (a um pedido já criado) ---
+const pedidoImagens = ref(null)
+const salvandoImagens = ref(false)
+const imagensExistentes = computed(() => pedidoImagens.value?.imagens || [])
+const vagasImagens = computed(() => MAX_ANEXOS - imagensExistentes.value.length)
+
+// Gestor do modal "Adicionar ilustrações"
+const {
+  anexos: anexosTardios,
+  arrastando: arrastandoTardio,
+  enviando: enviandoTardio,
+  onSelecionar: onSelecionarTardio,
+  onDrop: onDropTardio,
+  onPaste: onPasteTardio,
+  remover: removerAnexoTardio,
+  limpar: limparAnexosTardios,
+  enviarPendentes: enviarPendentesTardios,
+} = criarGestorAnexos(() => vagasImagens.value)
+
+onBeforeUnmount(() => {
+  limparAnexos()
+  limparAnexosTardios()
+})
+
+const abrirModalImagens = async (pedidoResumido) => {
+  // Se veio do modal de detalhes, fecha-o primeiro
+  await fecharModalAsync('detalhesPedidoModal')
+  limparAnexosTardios()
+
+  // Busca o pedido actual para saber as imagens que já tem (evita sobrescrever imagens mais recentes)
+  try {
+    pedidoImagens.value = await store.dispatch('getPedido', pedidoResumido._id)
+  } catch (err) {
+    pedidoImagens.value = pedidoResumido
+  }
+  abrirModal('imagensPedidoModal')
+}
+
+const salvarImagensTardias = async () => {
+  if (!pedidoImagens.value || !anexosTardios.value.length) return
+  salvandoImagens.value = true
+  try {
+    // 1) Envia as imagens para o Cloudinary e obtém os IDs
+    try {
+      await enviarPendentesTardios()
+    } catch (err) {
+      toast(err.message || 'Erro ao enviar as imagens. Tente novamente.', { type: 'error', autoClose: 3500 })
+      return
+    }
+
+    // 2) Actualiza o pedido com a lista completa de imagens (as que já tinha + as novas)
+    const novas = anexosTardios.value.map((a) => a.publicId).filter(Boolean)
+    await store.dispatch('atualizarPedido', {
+      id: pedidoImagens.value._id,
+      payload: { imagens: [...imagensExistentes.value, ...novas] },
+    })
+
+    toast('Ilustrações adicionadas ao pedido!', { type: 'success', autoClose: 2500 })
+    fecharModal('imagensPedidoModal')
+    limparAnexosTardios()
+    await carregarPedidos()
+  } catch (err) {
+    toast(err.response?.data?.message || 'Erro ao guardar as ilustrações', { type: 'error', autoClose: 3000 })
+  } finally {
+    salvandoImagens.value = false
+  }
+}
+
 // --- Novo pedido ---
 const form = ref({
-  cliente: '', produto: '', tipoProduto: '', especificacoes: '', quantidade: 1,
-  precoUnitario: '', dataEntregaPrevista: '', observacoes: '',
+  cliente: '', produto: '', tipoProduto: '', servicoOutro: '', adicionalOutro: '',
+  especificacoes: '', quantidade: 1, precoUnitario: '', dataEntregaPrevista: '', observacoes: '',
 })
 const errors = ref({})
 const salvando = ref(false)
 const clienteSelecionado = ref(null)
 const produtoSelecionado = ref(null)
 
-const valorTotal = computed(() => (Number(form.value.precoUnitario) || 0) * (Number(form.value.quantidade) || 0))
-const formatarMoeda = (v) => `${(Number(v) || 0).toFixed(2)} Kz`
+const formatarMoeda = (v) =>
+  `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
+
+// Serviço escolhido e respectivo valor adicional (por unidade)
+const ehOutroServico = computed(() => form.value.tipoProduto === SERVICO_OUTRO)
+
+const adicionalServico = computed(() => {
+  if (ehOutroServico.value) return Math.max(Number(form.value.adicionalOutro) || 0, 0)
+  const servico = servicosDisponiveis.find((s) => s.nome === form.value.tipoProduto)
+  return servico ? Number(servico.precoAdicional) || 0 : 0
+})
+
+// Nome do serviço que vai para o pedido (o texto digitado, quando é "Outro")
+const servicoFinal = computed(() =>
+  ehOutroServico.value ? (form.value.servicoOutro || '').trim() : (form.value.tipoProduto || '').trim()
+)
+
+// Preço do produto + adicional do serviço
+const precoUnitarioFinal = computed(() =>
+  Math.round(((Number(form.value.precoUnitario) || 0) + adicionalServico.value) * 100) / 100
+)
+
+const valorTotal = computed(() => precoUnitarioFinal.value * (Number(form.value.quantidade) || 0))
 
 const prazoLabel = computed(() => {
   if (!form.value.dataEntregaPrevista) return ''
@@ -640,17 +994,18 @@ const prazoLabel = computed(() => {
 
 const resetForm = () => {
   form.value = {
-    cliente: '', produto: '', tipoProduto: '', especificacoes: '', quantidade: 1,
-    precoUnitario: '', dataEntregaPrevista: calcularPrazoPadrao(), observacoes: '',
+    cliente: '', produto: '', tipoProduto: '', servicoOutro: '', adicionalOutro: '',
+    especificacoes: '', quantidade: 1, precoUnitario: '', dataEntregaPrevista: calcularPrazoPadrao(), observacoes: '',
   }
   errors.value = {}
   clienteSelecionado.value = null
   produtoSelecionado.value = null
+  limparAnexos()
 }
 
 const abrirModalNovo = () => {
   resetForm()
-  new Modal(document.getElementById('novoPedidoModal')).show()
+  abrirModal('novoPedidoModal')
 }
 
 // --- Seleção de cliente (modal próprio, com pesquisa e paginação) ---
@@ -678,7 +1033,7 @@ const abrirModalCliente = () => {
   mostrarCriarCliente.value = false
   novoClienteForm.value = { nome: '', telefone: '', nif: '' }
   pesquisarClientesModal()
-  new Modal(document.getElementById('selecionarClienteModal')).show()
+  abrirModal('selecionarClienteModal')
 }
 
 const mudarPaginaModalCliente = (n) => {
@@ -733,7 +1088,7 @@ watch(() => modalProduto.value.busca, () => pesquisarProdutosModal(true))
 const abrirModalProduto = () => {
   modalProduto.value = { busca: '', page: 1, limit: 6 }
   pesquisarProdutosModal()
-  new Modal(document.getElementById('selecionarProdutoModal')).show()
+  abrirModal('selecionarProdutoModal')
 }
 
 const mudarPaginaModalProduto = (n) => {
@@ -761,7 +1116,12 @@ const validarFormulario = () => {
   errors.value = {}
   if (!form.value.cliente) errors.value.cliente = 'Selecione o cliente'
   if (!form.value.produto) errors.value.produto = 'Selecione um produto do catálogo'
-  if (!form.value.tipoProduto?.trim()) errors.value.tipoProduto = 'Selecione o serviço'
+  if (!form.value.tipoProduto?.trim()) {
+    errors.value.tipoProduto = 'Selecione o serviço'
+  } else if (ehOutroServico.value) {
+    if (!servicoFinal.value) errors.value.servicoOutro = 'Escreva o nome do serviço'
+    if (Number(form.value.adicionalOutro) < 0) errors.value.adicionalOutro = 'O valor não pode ser negativo'
+  }
   if (!form.value.especificacoes?.trim()) errors.value.especificacoes = 'Campo obrigatório'
   return Object.keys(errors.value).length === 0
 }
@@ -770,15 +1130,26 @@ const salvarPedido = async () => {
   if (!validarFormulario()) return
   salvando.value = true
   try {
+    // 1) Envia as imagens para o Cloudinary (se houver) e obtém os IDs
+    try {
+      await enviarImagensPendentes()
+    } catch (err) {
+      toast(err.message || 'Erro ao enviar as imagens. Tente novamente.', { type: 'error', autoClose: 3500 })
+      return
+    }
+
+    // 2) Cria o pedido guardando apenas os IDs das imagens.
+    //    O preço unitário já leva o adicional do serviço, por isso o total e a factura ficam coerentes.
     await store.dispatch('criarPedido', {
       cliente: form.value.cliente,
       produto: form.value.produto || undefined,
-      tipoProduto: form.value.tipoProduto.trim(),
+      tipoProduto: servicoFinal.value,
       especificacoes: form.value.especificacoes.trim(),
       quantidade: Number(form.value.quantidade) || 1,
-      precoUnitario: form.value.precoUnitario !== '' ? Number(form.value.precoUnitario) : undefined,
+      precoUnitario: form.value.precoUnitario !== '' ? precoUnitarioFinal.value : undefined,
       dataEntregaPrevista: form.value.dataEntregaPrevista || undefined,
       observacoes: form.value.observacoes?.trim() || undefined,
+      imagens: anexos.value.map((a) => a.publicId).filter(Boolean),
     })
     toast('Pedido criado com sucesso!', { type: 'success', autoClose: 2500 })
     fecharModal('novoPedidoModal')
@@ -796,21 +1167,23 @@ const pedidoAtivo = ref(null)
 const abrirDetalhes = async (pedidoResumido) => {
   try {
     pedidoAtivo.value = await store.dispatch('getPedido', pedidoResumido._id)
-    new Modal(document.getElementById('detalhesPedidoModal')).show()
+    abrirModal('detalhesPedidoModal')
   } catch (err) {
     toast('Não foi possível carregar os detalhes do pedido', { type: 'error', autoClose: 2500 })
   }
 }
 
-// --- Mudança de status, agora sempre com confirmação prévia ---
+// --- Mudança de status, sempre com confirmação prévia ---
 const confirmacaoStatus = ref({ pedido: null, novoStatus: null })
 const confirmandoStatus = ref(false)
 const observacaoStatus = ref('')
 
-const pedirConfirmacaoStatus = (pedido, novoStatus) => {
+const pedirConfirmacaoStatus = async (pedido, novoStatus) => {
+  // Se o pedido veio do modal de detalhes, fecha-o antes de abrir a confirmação
+  await fecharModalAsync('detalhesPedidoModal')
   confirmacaoStatus.value = { pedido, novoStatus }
   observacaoStatus.value = ''
-  new Modal(document.getElementById('confirmarStatusModal')).show()
+  abrirModal('confirmarStatusModal')
 }
 
 const mudarStatus = async (pedido, novoStatus, observacao) => {
@@ -848,6 +1221,10 @@ const gerarFacturaPedido = async (pedidoResumido) => {
     toast('Não foi possível gerar a factura deste pedido', { type: 'error', autoClose: 2500 })
   }
 }
+// Dados impressos no cabeçalho da factura (junto de NOME_GRAFICA e NIF_GRAFICA)
+const ENDERECO_GRAFICA = 'Bairro: Agustinho Neto, Rua da praça da cidade, Lunda-sul'
+const EMAIL_GRAFICA = 'geral@exemplo.com' // TODO: colocar o e-mail real
+const TELEFONE_GRAFICA = '+244 900 000 000' // TODO: colocar o telefone real
 
 const montarPDFFactura = (pedido) => {
   // Código de barras (CODE128) com o número do pedido, desenhado num canvas oculto
@@ -884,16 +1261,28 @@ const montarPDFFactura = (pedido) => {
     console.warn('Não foi possível carregar o logotipo:', e)
   }
 
-  // Cabeçalho — identificação da gráfica
+  // Cabeçalho — identificação da gráfica (alinhado à esquerda pela margem, em maiúsculas)
+  y += 6 // espaço entre o logotipo e os dados
   doc.setTextColor(0, 0, 0)
-  doc.setFontSize(11)
+
+  doc.setFontSize(9)
   doc.setFont(undefined, 'bold')
-  doc.text(NOME_GRAFICA, CENTRO, y, { align: 'center' })
+  doc.text(String(NOME_GRAFICA).toUpperCase(), M, y)
   y += 4.5
+
   doc.setFontSize(8)
   doc.setFont(undefined, 'normal')
-  doc.text(`NIF: ${NIF_GRAFICA}`, CENTRO, y, { align: 'center' })
+  doc.text(`NIF: ${NIF_GRAFICA}`.toUpperCase(), M, y)
   y += 4
+
+  // Endereço, e-mail e telefone (quebram automaticamente se não couberem)
+  const linhasCabecalho = [
+    ...doc.splitTextToSize(ENDERECO_GRAFICA.toUpperCase(), LARGURA - 2 * M),
+    ...doc.splitTextToSize(`E-MAIL: ${EMAIL_GRAFICA}`.toUpperCase(), LARGURA - 2 * M),
+    ...doc.splitTextToSize(`TEL: ${TELEFONE_GRAFICA}`.toUpperCase(), LARGURA - 2 * M),
+  ]
+  doc.text(linhasCabecalho, M, y)
+  y += linhasCabecalho.length * 3.5 + 1
 
   doc.setDrawColor(180, 175, 165)
   doc.line(M, y, DIREITA, y)
@@ -940,7 +1329,7 @@ const montarPDFFactura = (pedido) => {
     margin: { left: M, right: M },
     head: [['Descrição', 'Qtd', 'Total']],
     body: [[
-      `${pedido.tipoProduto || '-'}\n${pedido.produto?.nome || '-'}\n${pedido.especificacoes || '-'}\nUnit.: ${formatarMoeda(pedido.precoUnitario)}`,
+      `${pedido.tipoProduto || '-'}\n${pedido.produto?.nome || '-'}\nUnit.: ${formatarMoeda(pedido.precoUnitario)}`,
       String(pedido.quantidade ?? '-'),
       formatarMoeda(totalPedido),
     ]],
@@ -977,11 +1366,17 @@ const montarPDFFactura = (pedido) => {
   const barY = finalY + 8
   doc.addImage(barcodeDataUrl, 'PNG', CENTRO - barW / 2, barY, barW, barH)
 
+  // Mensagem de agradecimento
+  doc.setFontSize(8)
+  doc.setFont(undefined, 'normal')
+  doc.setTextColor(0, 0, 0)
+  doc.text('Obrigado pela preferência. Volte sempre!', CENTRO, barY + barH + 12, { align: 'center' })
+
   // Rodapé
   doc.setFontSize(6.5)
   doc.setFont(undefined, 'normal')
   doc.setTextColor(140, 140, 140)
-  doc.text('Documento gerado automaticamente pelo sistema.', CENTRO, barY + barH + 6, { align: 'center' })
+  doc.text('Documento gerado automaticamente pelo sistema.', CENTRO, barY + barH + 17, { align: 'center' })
 
   doc.save(`${pedido.numeroPedido}.pdf`)
 }
@@ -1210,6 +1605,46 @@ const montarPDFFactura = (pedido) => {
   padding: 0.5rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
 }
 .btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
+.btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Ilustrações / imagens do pedido */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  padding: 1rem; text-align: center; font-size: 0.85rem; color: var(--ink-soft);
+  border: 1px dashed var(--paper-line); border-radius: 8px; background: var(--paper); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone-over { border-color: var(--rule); background: #fdf1f0; }
+.dropzone small { opacity: 0.7; }
+
+.anexos-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;
+}
+.anexo-item { position: relative; margin: 0; }
+.anexo-item img {
+  display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+  border: 1px solid var(--paper-line); border-radius: 8px; background: var(--paper);
+}
+.anexo-remove {
+  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--ink); color: #fff; font-size: 0.65rem; line-height: 1; cursor: pointer;
+}
+.anexo-remove:hover { background: var(--rule); }
+.anexo-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+.anexo-ok {
+  position: absolute; bottom: 6px; left: 6px; width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ok); color: #fff; font-size: 0.7rem;
+}
+.anexo-download {
+  display: inline-block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--rule); text-decoration: underline;
+}
+.anexo-badge {
+  display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600; color: var(--rule); background: #fdf1f0;
+}
+.anexos-detalhe { border-top: 1px dashed var(--paper-line); padding: 1rem 0; margin-bottom: 0.5rem; }
+.anexos-existentes { padding-bottom: 0.25rem; }
 
 /* Detalhes */
 .detalhe-grid {

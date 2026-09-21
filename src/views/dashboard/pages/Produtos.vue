@@ -41,9 +41,17 @@
       </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="filtros-bar">
-      <div class="relative flex-1 min-w-[220px]">
+    <!-- Abas de status -->
+    <div class="tabs-bar">
+      <button v-for="aba in abas" :key="aba.valor" class="tab-btn" :class="{ active: filtros.status === aba.valor }"
+        @click="filtros.status = aba.valor">
+        {{ aba.label }}
+        <span v-if="resumo && resumo[aba.chave] !== undefined" class="tab-count">
+          {{ resumo[aba.chave] }}
+        </span>
+      </button>
+
+      <div class="relative flex-1 min-w-[220px] ml-auto">
         <input type="text" v-model="filtros.busca" placeholder="Buscar por nome, código ou descrição..."
           class="ledger-input pl-9" />
         <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -52,16 +60,10 @@
         </svg>
       </div>
 
-      <select v-model="filtros.status" class="ledger-input select-narrow">
-        <option value="">Todos os status</option>
-        <option value="ativo">Ativos</option>
-        <option value="inativo">Inativos</option>
-      </select>
-    </div>
-
-    <div v-if="filtrosAtivos" class="filtro-ativo">
-      <span>Filtros aplicados</span>
-      <button @click="limparFiltros">Limpar</button>
+      <button v-if="filtrosAtivos" class="toggle-pill active" @click="limparFiltros">
+        <span class="dot dot-rule"></span>
+        Limpar filtros
+      </button>
     </div>
 
     <!-- Tabela / Loading / Error -->
@@ -83,9 +85,9 @@
             <thead>
               <tr>
                 <th class="text-left">Produto</th>
-                <th class="text-left">Código</th>
                 <th class="text-left">Cor</th>
                 <th class="text-right">Preço</th>
+                <th class="text-left">Custo</th>
                 <th class="text-left">Unidade</th>
                 <th class="text-right">Estoque</th>
                 <th class="text-left">Status</th>
@@ -99,7 +101,7 @@
                   <div class="font-medium text-ink">{{ produto.nome }}</div>
                   <div class="text-sm text-stone-500 line-clamp-1">{{ produto.descricao || 'Sem descrição' }}</div>
                 </td>
-                <td data-label="Código" class="text-stone-500">{{ produto.codigo || '-' }}</td>
+
                 <td data-label="Cor">
                   <span v-if="produto.cor" class="cor-tag">
                     <span class="cor-dot" :style="{ background: corParaHex(produto.cor) }"></span>
@@ -107,7 +109,9 @@
                   </span>
                   <span v-else class="text-stone-400">-</span>
                 </td>
-                <td data-label="Preço" class="text-right num font-semibold text-ink">{{ produto.preco.toFixed(2) }} Kz
+                <td data-label="Preço" class="text-right num font-semibold text-ink">{{ formatarMoeda(produto.preco) }}
+                </td>
+                <td data-label="Custo" class="text-right num font-semibold text-ink">{{ formatarMoeda(produto.custo) }}
                 </td>
                 <td data-label="Unidade" class="text-stone-500 uppercase">{{ produto.unidade }}</td>
                 <td data-label="Estoque" class="text-right">
@@ -337,6 +341,12 @@ const filtros = ref({
   limit: 10
 })
 
+const abas = [
+  { valor: '', label: 'Todos', chave: 'total' },
+  { valor: 'ativo', label: 'Ativos', chave: 'totalAtivos' },
+  { valor: 'inativo', label: 'Inativos', chave: 'totalInativos' },
+]
+
 // Sugestões de cores para preenchimento rápido no formulário
 const coresSugeridas = [
   { nome: 'Branca', hex: '#FFFFFF' },
@@ -399,6 +409,12 @@ const carregarResumo = async () => {
     // Falha silenciosa: os cartões de resumo simplesmente não aparecem
   }
 }
+
+const formatarMoeda = (v) =>
+  `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
 
 // Filtros ativos
 const filtrosAtivos = computed(() => filtros.value.busca || filtros.value.status)
@@ -1293,6 +1309,46 @@ const limparFiltros = () => {
   cursor: not-allowed;
 }
 
+.tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  transition: all 0.15s;
+}
+
+.tab-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.tab-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+
+.tab-btn.active .tab-count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+
 .page-btn.active {
   background: var(--ink);
   border-color: var(--ink);
@@ -1326,6 +1382,39 @@ const limparFiltros = () => {
 
 .modal.fade .modal-dialog {
   transition: transform 0.2s ease-out;
+}
+
+.toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--paper-line);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  transition: all 0.15s;
+}
+
+.toggle-pill.active {
+  border-color: var(--rule);
+  color: var(--rule);
+  background: #fdf1f0;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-rule {
+  background: var(--rule);
+}
+
+.dot-ok {
+  background: var(--ok);
 }
 
 /* Tabela responsiva (empilha em cartões no mobile) */

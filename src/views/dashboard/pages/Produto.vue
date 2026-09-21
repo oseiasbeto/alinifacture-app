@@ -67,7 +67,7 @@
           </div>
           <div class="info-item">
             <dt>Custo</dt>
-            <dd class="num">{{ (produto?.custo || 0).toFixed(2) }} Kz</dd>
+            <dd class="num">{{ formatarMoeda(produto?.custo) }}</dd>
           </div>
           <div class="info-item">
             <dt>Tributável</dt>
@@ -355,6 +355,12 @@ const fecharModalEditar = () => {
   const instance = el && Modal.getInstance(el)
   if (instance) instance.hide()
 }
+
+const formatarMoeda = (v) =>
+  `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
 
 const validarFormulario = () => {
   errors.value = {}

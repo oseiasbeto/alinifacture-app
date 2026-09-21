@@ -153,7 +153,11 @@ const aplicarPreset = (p) => {
 
 const carregar = () => store.dispatch('carregarDashboard', filtros.value)
 
-const formatarMoeda = (v) => `${(Number(v) || 0).toFixed(2)} Kz`
+const formatarMoeda = (v) =>
+  `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
 
 const maiorValorTopProdutos = computed(() => {
   if (!dashboard.value?.topProdutos?.length) return 1

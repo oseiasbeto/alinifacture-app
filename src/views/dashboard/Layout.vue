@@ -108,19 +108,18 @@ onMounted(async () => {
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
                 <!-- Breadcrumb dinâmico -->
-                <nav v-if="breadcrumbs.length" class="flex mb-6 text-sm text-gray-500">
-                    <ol class="flex items-center flex-wrap gap-2">
+                <nav v-if="breadcrumbs.length" class="breadcrumb mb-6" aria-label="Breadcrumb">
+                    <ol class="breadcrumb-list">
                         <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
-                            <li>
-                                <router-link v-if="!crumb.isLast" :to="crumb.path" class="hover:text-gray-700">
+                            <li class="breadcrumb-item">
+                                <router-link v-if="!crumb.isLast" :to="crumb.path" class="crumb-link">
                                     {{ crumb.label }}
                                 </router-link>
-                                <span v-else class="text-gray-700 font-medium">{{ crumb.label }}</span>
+                                <span v-else class="crumb-current" aria-current="page">{{ crumb.label }}</span>
                             </li>
-                            <li v-if="!crumb.isLast">
-                                <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
+                            <li v-if="!crumb.isLast" class="crumb-sep" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="m9 18 6-6-6-6" />
                                 </svg>
                             </li>
                         </template>
@@ -147,12 +146,80 @@ onMounted(async () => {
         opacity: 0;
         transform: translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
+.breadcrumb {
+  --ink: #201d1a;
+  --ink-soft: #4a453f;
+  --paper: #faf8f3;
+  --paper-line: #e7e0d3;
+  --rule: #b5433c;
+  font-family: 'Inter', system-ui, sans-serif;
+}
 
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+/* Níveis anteriores */
+.crumb-link {
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  transition: color 0.15s, background 0.15s;
+}
+.crumb-link:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+.crumb-link:focus-visible {
+  outline: 2px solid var(--rule);
+  outline-offset: 2px;
+}
+
+/* Página atual (mesmo tratamento do item ativo do menu) */
+.crumb-current {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rule);
+  background: #fdf1f0;
+}
+
+/* Separador */
+.crumb-sep {
+  display: flex;
+  align-items: center;
+  color: #cfc6b4;
+}
+.crumb-sep svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .animate-slide-down {
     animation: slideDown 0.3s ease-out;
 }
