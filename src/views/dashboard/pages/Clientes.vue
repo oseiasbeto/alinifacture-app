@@ -8,7 +8,7 @@
       </div>
       <div class="flex gap-2">
         <button @click="gerarPDFClientes" class="btn-ghost">↓ Exportar</button>
-        <button class="btn-primary" @click="abrirModalNovo">+ Novo Cliente</button>
+        <button v-if="podeGerirClientes" class="btn-primary" @click="abrirModalNovo">+ Novo Cliente</button>
       </div>
     </div>
 
@@ -85,7 +85,7 @@
               <th class="text-left">Cidade/Província</th>
               <th class="text-left">Tipo</th>
               <th class="text-left">Status</th>
-              <th class="text-right">Ações</th>
+              <th v-if="podeGerirClientes" class="text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -105,7 +105,7 @@
                 <span class="status-dot" :class="cliente.ativo ? 'dot-ok' : 'dot-rule'"></span>
                 {{ cliente.ativo ? 'Ativo' : 'Inativo' }}
               </td>
-              <td class="text-right whitespace-nowrap">
+              <td v-if="podeGerirClientes" class="text-right whitespace-nowrap">
                 <button class="btn-icon" title="Editar" @click="editarCliente(cliente)">✎</button>
                 <button class="btn-icon btn-rule" title="Excluir" @click="confirmarExclusao(cliente)">🗑</button>
               </td>
@@ -113,8 +113,7 @@
           </tbody>
         </table>
       </div>
-
-      <div class="ledger-footer">
+      <div class="ledger-footer" v-if="paginationInfo.totalPages > 1">
         <div>
           Mostrando {{ (paginationInfo.page - 1) * paginationInfo.limit + 1 }}–
           {{ Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.totalDocs) }} de
@@ -132,7 +131,7 @@
     </div>
 
     <!-- Modal Novo/Editar Cliente -->
-    <div class="modal fade" id="novoClienteModal" tabindex="-1" aria-hidden="true">
+    <div v-if="podeGerirClientes" class="modal fade" id="novoClienteModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg">
         <div class="modal-content ledger-modal">
           <div class="modal-header">
@@ -230,7 +229,7 @@
     </div>
 
     <!-- Modal Confirmação Exclusão -->
-    <div class="modal fade" id="confirmarExclusaoClienteModal" tabindex="-1" aria-hidden="true">
+    <div v-if="podeGerirClientes" class="modal fade" id="confirmarExclusaoClienteModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content ledger-modal">
           <div class="modal-header">
@@ -264,6 +263,16 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 const store = useStore()
+
+// Apenas "caixa", "administrador" e "estoquista" podem criar, editar ou excluir clientes.
+// Ajuste os valores abaixo se os cargos no teu sistema tiverem outra grafia.
+const user = computed(() => store.getters.currentUser)
+const CARGOS_GESTAO_CLIENTES = ['caixa', 'administrador']
+
+const podeGerirClientes = computed(() => {
+  const cargo = user.value?.cargo?.toLowerCase()
+  return CARGOS_GESTAO_CLIENTES.includes(cargo)
+})
 
 // Filtros
 const filtros = ref({
@@ -411,12 +420,23 @@ const resetForm = () => {
   nifError.value = ''
 }
 
+// Só caixa/administrador/estoquista podem abrir o modal de criação de cliente
 const abrirModalNovo = () => {
+  if (!podeGerirClientes.value) {
+    toast('Apenas caixa, administrador e estoquista podem criar clientes', { type: 'error', autoClose: 2500 })
+    return
+  }
   resetForm()
   new Modal(document.getElementById('novoClienteModal')).show()
 }
 
+// Só caixa/administrador/estoquista podem editar um cliente existente
 const editarCliente = (cliente) => {
+  if (!podeGerirClientes.value) {
+    toast('Apenas caixa, administrador e estoquista podem editar clientes', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   modoEdicao.value = true
   clienteSelecionado.value = cliente
 
@@ -448,7 +468,13 @@ const validarFormulario = () => {
   return Object.keys(errors.value).length === 0
 }
 
+// Guarda de permissão aplicada tanto à criação como à edição
 const salvarCliente = async () => {
+  if (!podeGerirClientes.value) {
+    toast('Apenas caixa, administrador e estoquista podem salvar clientes', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   if (!validarFormulario()) return
 
   salvando.value = true
@@ -486,12 +512,23 @@ const salvarCliente = async () => {
   }
 }
 
+// Só caixa/administrador/estoquista podem abrir a confirmação de exclusão
 const confirmarExclusao = (cliente) => {
+  if (!podeGerirClientes.value) {
+    toast('Apenas caixa, administrador e estoquista podem excluir clientes', { type: 'error', autoClose: 2500 })
+    return
+  }
   clienteSelecionado.value = cliente
   new Modal(document.getElementById('confirmarExclusaoClienteModal')).show()
 }
 
+// Guarda de permissão também na execução efetiva da exclusão
 const excluirCliente = async () => {
+  if (!podeGerirClientes.value) {
+    toast('Apenas caixa, administrador e estoquista podem excluir clientes', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   excluindo.value = true
 
   try {

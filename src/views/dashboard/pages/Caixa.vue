@@ -6,7 +6,7 @@
         <h1 class="ledger-title">Pedidos</h1>
         <p class="text-sm text-stone-500 mt-1">Do atendimento à entrega — acompanhe cada pedido</p>
       </div>
-      <button class="btn-primary" @click="abrirModalNovo">+ Novo Pedido</button>
+      <button v-if="podeGerirPedidos" class="btn-primary" @click="abrirModalNovo">+ Novo Pedido</button>
     </div>
 
     <!-- Cartões de resumo -->
@@ -88,7 +88,12 @@
                 </span>
               </td>
               <td class="text-right num">{{ pedido.quantidade }}</td>
-              <td class="text-stone-500 whitespace-nowrap">{{ formatarDataCurta(pedido.dataEntregaPrevista) }}</td>
+              <td class="text-stone-500 whitespace-nowrap">
+                {{ formatarDataCurta(pedido.dataEntregaPrevista) }}
+                <span v-if="pedidoAtrasado(pedido)" class="atraso-badge" title="Prazo de entrega ultrapassado">
+                  ⚠ Atrasado
+                </span>
+              </td>
               <td>
                 <span class="status-badge" :class="'badge-' + pedido.status">
                   <span class="status-dot"></span>
@@ -96,13 +101,13 @@
                 </span>
               </td>
               <td class="text-right whitespace-nowrap" @click.stop>
-                <button v-for="prox in proximosStatus(pedido.status)" :key="prox" class="btn-icon"
+                <button v-for="prox in proximosStatusPermitidos(pedido.status)" :key="prox" class="btn-icon"
                   :class="iconClasseStatus(prox)" :title="'Marcar como ' + statusLabel(prox)"
                   @click="pedirConfirmacaoStatus(pedido, prox)">
                   {{ iconePorStatus(prox) }}
                 </button>
-                <button class="btn-icon" title="Adicionar ilustrações" @click="abrirModalImagens(pedido)">📷</button>
-                <button class="btn-icon" title="Gerar Factura/Recibo (PDF)" @click="gerarFacturaPedido(pedido)">🧾</button>
+                <button v-if="podeGerirPedidos" class="btn-icon" title="Gerar Factura/Recibo (PDF)"
+                  @click="gerarFacturaPedido(pedido)">🧾</button>
                 <button class="btn-icon" title="Detalhes" @click="abrirDetalhes(pedido)">≡</button>
               </td>
             </tr>
@@ -116,10 +121,12 @@
           {{ Math.min(pagination.page * pagination.limit, pagination.totalDocs) }} de {{ pagination.totalDocs }} pedidos
         </div>
         <nav class="flex gap-1">
-          <button class="page-btn" :disabled="pagination.page === 1" @click="mudarPagina(pagination.page - 1)">Anterior</button>
+          <button class="page-btn" :disabled="pagination.page === 1"
+            @click="mudarPagina(pagination.page - 1)">Anterior</button>
           <button v-for="n in Math.min(7, pagination.totalPages)" :key="n" class="page-btn"
             :class="{ active: pagination.page === n }" @click="mudarPagina(n)">{{ n }}</button>
-          <button class="page-btn" :disabled="!pagination.hasNextPage" @click="mudarPagina(pagination.page + 1)">Próxima</button>
+          <button class="page-btn" :disabled="!pagination.hasNextPage"
+            @click="mudarPagina(pagination.page + 1)">Próxima</button>
         </nav>
       </div>
     </div>
@@ -162,9 +169,11 @@
 
                 <div class="col-12">
                   <label class="ledger-label">Serviço <span class="text-rule">*</span></label>
-                  <select class="ledger-input" v-model="form.tipoProduto" :class="{ 'input-invalid': errors.tipoProduto }">
+                  <select class="ledger-input" v-model="form.tipoProduto"
+                    :class="{ 'input-invalid': errors.tipoProduto }">
                     <option value="">Selecione o serviço</option>
-                    <option v-for="s in servicosDisponiveis" :key="s.nome" :value="s.nome">{{ rotuloServico(s) }}</option>
+                    <option v-for="s in servicosDisponiveis" :key="s.nome" :value="s.nome">{{ rotuloServico(s) }}
+                    </option>
                   </select>
                   <div class="error-text" v-if="errors.tipoProduto">{{ errors.tipoProduto }}</div>
                 </div>
@@ -174,8 +183,7 @@
                   <div class="col-md-8">
                     <label class="ledger-label">Nome do serviço <span class="text-rule">*</span></label>
                     <input type="text" class="ledger-input" v-model="form.servicoOutro"
-                      placeholder="Escreva o serviço pretendido..."
-                      :class="{ 'input-invalid': errors.servicoOutro }" />
+                      placeholder="Escreva o serviço pretendido..." :class="{ 'input-invalid': errors.servicoOutro }" />
                     <div class="error-text" v-if="errors.servicoOutro">{{ errors.servicoOutro }}</div>
                   </div>
                   <div class="col-md-4">
@@ -187,7 +195,8 @@
                 </template>
                 <div class="col-12" v-else-if="adicionalServico > 0">
                   <small class="text-stone-500">
-                    Este serviço acrescenta <strong class="num">{{ formatarMoeda(adicionalServico) }}</strong> por unidade.
+                    Este serviço acrescenta <strong class="num">{{ formatarMoeda(adicionalServico) }}</strong> por
+                    unidade ao Valor total.
                   </small>
                 </div>
 
@@ -204,21 +213,20 @@
                   <label class="ledger-label">
                     Ilustração / referência <span class="text-stone-400">(opcional)</span>
                   </label>
-                  <label class="dropzone" :class="{ 'dropzone-over': arrastando }"
-                    @dragover.prevent="arrastando = true" @dragleave.prevent="arrastando = false"
-                    @drop.prevent="arrastando = false; onDrop($event)">
+                  <label class="dropzone" :class="{ 'dropzone-over': arrastando }" @dragover.prevent="arrastando = true"
+                    @dragleave.prevent="arrastando = false" @drop.prevent="arrastando = false; onDrop($event)">
                     <input type="file" accept="image/*" multiple class="hidden" @change="onSelecionarArquivos" />
                     <span>Arraste as imagens, clique para escolher ou cole (Ctrl+V)</span>
                     <small>Até {{ MAX_ANEXOS }} imagens, {{ MAX_MB }} MB cada</small>
                   </label>
-                 
+
 
                   <div v-if="anexos.length" class="anexos-grid">
                     <div v-for="(a, i) in anexos" :key="a.preview" class="anexo-item">
                       <img :src="a.preview" alt="Pré-visualização" />
                       <span v-if="a.publicId" class="anexo-ok" title="Enviada">✓</span>
-                      <button type="button" class="anexo-remove" aria-label="Remover imagem"
-                        :disabled="salvando" @click="removerAnexo(i)">✕</button>
+                      <button type="button" class="anexo-remove" aria-label="Remover imagem" :disabled="salvando"
+                        @click="removerAnexo(i)">✕</button>
                     </div>
                   </div>
                 </div>
@@ -230,16 +238,17 @@
 
                 <div class="col-md-4">
                   <label class="ledger-label">Preço unitário <span class="text-rule">*</span></label>
-                  <input type="text" class="ledger-input num" :value="formatarMoeda(precoUnitarioFinal)" disabled />
-                  <small v-if="adicionalServico > 0" class="text-stone-500 d-block mt-1">
-                    Produto {{ formatarMoeda(form.precoUnitario) }} + serviço {{ formatarMoeda(adicionalServico) }}
-                  </small>
+                  <input type="text" class="ledger-input num" :value="formatarMoeda(form.precoUnitario)" disabled />
                   <div class="error-text" v-if="errors.precoUnitario">{{ errors.precoUnitario }}</div>
                 </div>
 
                 <div class="col-md-4">
                   <label class="ledger-label">Valor total <span class="text-rule">*</span></label>
                   <input type="text" class="ledger-input num" :value="formatarMoeda(valorTotal)" disabled />
+                  <small v-if="adicionalServico > 0" class="text-stone-500 d-block mt-1">
+                    Inclui +{{ formatarMoeda(adicionalServico) }}/un. de serviço
+                    ({{ formatarMoeda(adicionalServico * (Number(form.quantidade) || 0)) }} no total)
+                  </small>
                 </div>
 
                 <div class="col-md-6">
@@ -299,15 +308,16 @@
                   @drop.prevent="arrastandoTardio = false; onDropTardio($event)">
                   <input type="file" accept="image/*" multiple class="hidden" @change="onSelecionarTardio" />
                   <span>Arraste as imagens, clique para escolher ou cole (Ctrl+V)</span>
-                  <small>Pode adicionar mais {{ vagasImagens }} {{ vagasImagens === 1 ? 'imagem' : 'imagens' }}, {{ MAX_MB }} MB cada</small>
+                  <small>Pode adicionar mais {{ vagasImagens }} {{ vagasImagens === 1 ? 'imagem' : 'imagens' }}, {{
+                    MAX_MB }} MB cada</small>
                 </label>
 
                 <div v-if="anexosTardios.length" class="anexos-grid">
                   <div v-for="(a, i) in anexosTardios" :key="a.preview" class="anexo-item">
                     <img :src="a.preview" alt="Pré-visualização" />
                     <span v-if="a.publicId" class="anexo-ok" title="Enviada">✓</span>
-                    <button type="button" class="anexo-remove" aria-label="Remover imagem"
-                      :disabled="salvandoImagens" @click="removerAnexoTardio(i)">✕</button>
+                    <button type="button" class="anexo-remove" aria-label="Remover imagem" :disabled="salvandoImagens"
+                      @click="removerAnexoTardio(i)">✕</button>
                   </div>
                 </div>
               </template>
@@ -342,7 +352,8 @@
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <button type="button" class="btn-ghost whitespace-nowrap" @click="mostrarCriarCliente = !mostrarCriarCliente">
+              <button type="button" class="btn-ghost whitespace-nowrap"
+                @click="mostrarCriarCliente = !mostrarCriarCliente">
                 {{ mostrarCriarCliente ? 'Cancelar' : '+ Novo Cliente' }}
               </button>
             </div>
@@ -360,8 +371,8 @@
                   <input type="text" class="ledger-input" v-model="novoClienteForm.nif" placeholder="NIF (opcional)" />
                 </div>
                 <div class="col-md-6 flex items-center">
-                  <button type="button" class="btn-primary w-full" :disabled="salvandoClienteRapido || !novoClienteForm.nome?.trim()"
-                    @click="salvarClienteRapido">
+                  <button type="button" class="btn-primary w-full"
+                    :disabled="salvandoClienteRapido || !novoClienteForm.nome?.trim()" @click="salvarClienteRapido">
                     {{ salvandoClienteRapido ? 'Criando...' : 'Criar e Selecionar' }}
                   </button>
                 </div>
@@ -369,7 +380,8 @@
             </div>
 
             <div v-if="clientesLoadingModal" class="text-center text-stone-500 py-8">Carregando clientes...</div>
-            <div v-else-if="clientesListados.length === 0" class="text-center text-stone-500 py-8">Nenhum cliente encontrado.</div>
+            <div v-else-if="clientesListados.length === 0" class="text-center text-stone-500 py-8">Nenhum cliente
+              encontrado.</div>
             <table v-else class="ledger-table w-full">
               <thead>
                 <tr>
@@ -424,7 +436,8 @@
             </div>
 
             <div v-if="produtosLoadingModal" class="text-center text-stone-500 py-8">Carregando produtos...</div>
-            <div v-else-if="produtosListados.length === 0" class="text-center text-stone-500 py-8">Nenhum produto encontrado.</div>
+            <div v-else-if="produtosListados.length === 0" class="text-center text-stone-500 py-8">Nenhum produto
+              encontrado.</div>
             <table v-else class="ledger-table w-full">
               <thead>
                 <tr>
@@ -443,7 +456,8 @@
                   <td class="text-right">
                     <span v-if="!p.controlaEstoque" class="text-stone-400 text-sm">Não controla</span>
                     <span v-else class="num">
-                      <span class="status-dot-inline" :class="p.quantidade < (Number(form.quantidade) || 1) ? 'dot-pendente' : 'dot-entregue'"></span>
+                      <span class="status-dot-inline"
+                        :class="p.quantidade < (Number(form.quantidade) || 1) ? 'dot-pendente' : 'dot-entregue'"></span>
                       {{ p.quantidade }} un.
                     </span>
                   </td>
@@ -482,7 +496,9 @@
           </div>
           <div class="modal-body" v-if="confirmacaoStatus.pedido">
             <p class="text-sm text-ink">
-              Tem certeza que deseja mudar o pedido <strong class="num">{{ confirmacaoStatus.pedido.numeroPedido }}</strong> de
+              Tem certeza que deseja mudar o pedido <strong class="num">{{ confirmacaoStatus.pedido.numeroPedido
+              }}</strong>
+              de
             </p>
             <div class="flex items-center gap-2 my-3">
               <span class="status-badge" :class="'badge-' + confirmacaoStatus.pedido.status">
@@ -528,7 +544,7 @@
               </span>
 
               <div class="flex gap-2 flex-wrap">
-                <button v-for="prox in proximosStatus(pedidoAtivo.status)" :key="prox" class="btn-ghost"
+                <button v-for="prox in proximosStatusPermitidos(pedidoAtivo.status)" :key="prox" class="btn-ghost"
                   @click="pedirConfirmacaoStatus(pedidoAtivo, prox)">
                   {{ prox === 'cancelado' ? 'Cancelar' : 'Marcar como ' + statusLabel(prox) }}
                 </button>
@@ -554,7 +570,12 @@
               </div>
               <div>
                 <dt>Prazo de entrega</dt>
-                <dd>{{ formatarDataCurta(pedidoAtivo.dataEntregaPrevista) }}</dd>
+                <dd>
+                  {{ formatarDataCurta(pedidoAtivo.dataEntregaPrevista) }}
+                  <span v-if="pedidoAtrasado(pedidoAtivo)" class="atraso-badge" title="Prazo de entrega ultrapassado">
+                    ⚠ Atrasado
+                  </span>
+                </dd>
               </div>
               <div>
                 <dt>Atendente</dt>
@@ -595,8 +616,17 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn-ghost" @click="abrirModalImagens(pedidoAtivo)">📷 Adicionar ilustrações</button>
-            <button type="button" class="btn-ghost" @click="gerarFacturaPedido(pedidoAtivo)">🧾 Gerar Factura/Recibo</button>
+            <button type="button" style="display: flex; flex-direction: row; align-items: center; gap: 0.5rem;"
+              class="btn-ghost" @click="abrirModalImagens(pedidoAtivo)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" viewBox="0 0 15 15" fill="none">
+                <path
+                  d="M0.5 0V4.5C0.5 5.60457 1.39543 6.5 2.5 6.5C3.60457 6.5 4.5 5.60457 4.5 4.5V1.5C4.5 0.947715 4.05228 0.5 3.5 0.5C2.94772 0.5 2.5 0.947715 2.5 1.5V5M6 0.5H12.5C13.0523 0.5 13.5 0.947715 13.5 1.5V13.5C13.5 14.0523 13.0523 14.5 12.5 14.5H2.5C1.94772 14.5 1.5 14.0523 1.5 13.5V8M11 4.5H7M11 7.5H7M11 10.5H4"
+                  stroke="#000000" />
+              </svg>
+              Adicionar ilustrações</button>
+            <button v-if="podeGerirPedidos" type="button" class="btn-ghost" @click="gerarFacturaPedido(pedidoAtivo)">🧾
+              Gerar
+              Factura/Recibo</button>
             <button type="button" class="btn-ghost" @click="fecharModal('detalhesPedidoModal')">Fechar</button>
           </div>
         </div>
@@ -618,8 +648,8 @@ import logoGrafica from '@/assets/fac1.png'
 const store = useStore()
 
 // Dados fiscais da gráfica, usados na factura/recibo gerado em PDF.
-const NOME_GRAFICA = 'Grafica do Leste'
-const NIF_GRAFICA = '5112158212'
+const NOME_GRAFICA = 'Gráfica do Leste'
+const NIF_GRAFICA = '5002063956'
 
 // Cloudinary: upload directo do frontend (preset "unsigned"). Só o public_id é guardado no pedido.
 const CLOUD_NAME = "dxgfptejc"
@@ -725,6 +755,42 @@ const pedidosError = computed(() => store.getters.pedidosError || null)
 const resumo = computed(() => store.getters.resumoPedidos)
 const clientesListados = computed(() => store.getters.clientesListados || [])
 const produtosListados = computed(() => store.getters.produtosListados || [])
+const usuarioLogado = computed(() => store.getters.currentUser || {})
+
+// --- Permissões por cargo ---
+// Apenas "caixa" e "administrador" podem criar pedidos, gerar factura/recibo e alterar QUALQUER
+// status (incluindo cancelar e marcar como entregue). O "designer" só pode avançar o pedido para
+// "Em Execução" ou "Pronto" — nenhuma outra ação de gestão de pedidos fica disponível para ele.
+// Qualquer outro cargo não listado não tem permissão para nenhuma destas ações.
+const CARGOS_GESTAO_PEDIDOS = ['caixa', 'administrador']
+
+// Transições que o designer pode aplicar, por status ACTUAL do pedido (não apenas por status de
+// destino). Isto é importante porque TRANSICOES['pronto'] inclui 'em_execucao' (para o caixa poder
+// recuar em caso de engano) — mas o designer não deve ver nenhum botão assim que o pedido chega a
+// "pronto": só avança (pendente -> em_execucao -> pronto), nunca recua nem cancela/entrega.
+const TRANSICOES_DESIGNER = {
+  pendente: ['em_execucao'],
+  em_execucao: ['pronto'],
+  pronto: [],
+  entregue: [],
+  cancelado: [],
+}
+
+const podeGerirPedidos = computed(() => {
+  const cargo = usuarioLogado.value?.cargo?.toLowerCase()
+  return CARGOS_GESTAO_PEDIDOS.includes(cargo)
+})
+
+const ehDesigner = computed(() => usuarioLogado.value?.cargo?.toLowerCase() === 'designer')
+
+// Transições de status disponíveis para o utilizador actual, no status actual do pedido.
+// Usada em vez de proximosStatus() em todos os pontos da UI.
+const proximosStatusPermitidos = (statusAtual) => {
+  const opcoes = proximosStatus(statusAtual)
+  if (podeGerirPedidos.value) return opcoes
+  if (ehDesigner.value) return (TRANSICOES_DESIGNER[statusAtual] || []).filter((s) => opcoes.includes(s))
+  return []
+}
 
 const carregarPedidos = async (resetPage = false) => {
   if (resetPage) filtros.value.page = 1
@@ -978,7 +1044,9 @@ const servicoFinal = computed(() =>
   ehOutroServico.value ? (form.value.servicoOutro || '').trim() : (form.value.tipoProduto || '').trim()
 )
 
-// Preço do produto + adicional do serviço
+// Preço do produto + adicional do serviço (usado APENAS para o cálculo do Valor total e para o
+// valor enviado ao backend — o campo "Preço unitário" mostrado ao utilizador exibe sempre o
+// preço puro do catálogo, sem o adicional, para não confundir com o preço do produto).
 const precoUnitarioFinal = computed(() =>
   Math.round(((Number(form.value.precoUnitario) || 0) + adicionalServico.value) * 100) / 100
 )
@@ -1003,7 +1071,12 @@ const resetForm = () => {
   limparAnexos()
 }
 
+// Só caixa/administrador podem abrir o modal de criação de pedido
 const abrirModalNovo = () => {
+  if (!podeGerirPedidos.value) {
+    toast('Apenas caixa e administrador podem criar pedidos', { type: 'error', autoClose: 2500 })
+    return
+  }
   resetForm()
   abrirModal('novoPedidoModal')
 }
@@ -1126,7 +1199,13 @@ const validarFormulario = () => {
   return Object.keys(errors.value).length === 0
 }
 
+// Só caixa/administrador podem criar um novo pedido
 const salvarPedido = async () => {
+  if (!podeGerirPedidos.value) {
+    toast('Apenas caixa e administrador podem criar pedidos', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   if (!validarFormulario()) return
   salvando.value = true
   try {
@@ -1139,7 +1218,9 @@ const salvarPedido = async () => {
     }
 
     // 2) Cria o pedido guardando apenas os IDs das imagens.
-    //    O preço unitário já leva o adicional do serviço, por isso o total e a factura ficam coerentes.
+    //    O preço unitário enviado já leva o adicional do serviço (precoUnitarioFinal), por isso o
+    //    total e a factura continuam coerentes — o que mudou foi apenas o que é mostrado ao
+    //    utilizador no formulário (ver "Preço unitário" e "Valor total" no template).
     await store.dispatch('criarPedido', {
       cliente: form.value.cliente,
       produto: form.value.produto || undefined,
@@ -1148,6 +1229,7 @@ const salvarPedido = async () => {
       quantidade: Number(form.value.quantidade) || 1,
       precoUnitario: form.value.precoUnitario !== '' ? precoUnitarioFinal.value : undefined,
       dataEntregaPrevista: form.value.dataEntregaPrevista || undefined,
+      valorAdicionalServico: adicionalServico.value > 0 ? adicionalServico.value : undefined,
       observacoes: form.value.observacoes?.trim() || undefined,
       imagens: anexos.value.map((a) => a.publicId).filter(Boolean),
     })
@@ -1178,7 +1260,13 @@ const confirmacaoStatus = ref({ pedido: null, novoStatus: null })
 const confirmandoStatus = ref(false)
 const observacaoStatus = ref('')
 
+// Verifica a permissão (por cargo e por status de destino) antes de abrir a confirmação
 const pedirConfirmacaoStatus = async (pedido, novoStatus) => {
+  if (!proximosStatusPermitidos(pedido.status).includes(novoStatus)) {
+    toast('Não tem permissão para esta mudança de status', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   // Se o pedido veio do modal de detalhes, fecha-o antes de abrir a confirmação
   await fecharModalAsync('detalhesPedidoModal')
   confirmacaoStatus.value = { pedido, novoStatus }
@@ -1193,9 +1281,16 @@ const mudarStatus = async (pedido, novoStatus, observacao) => {
   await Promise.all([carregarPedidos(), carregarResumo()])
 }
 
+// Reconfirma a permissão imediatamente antes de despachar a mudança (defesa em profundidade)
 const confirmarMudancaStatus = async () => {
   const { pedido, novoStatus } = confirmacaoStatus.value
   if (!pedido || !novoStatus) return
+
+  if (!proximosStatusPermitidos(pedido.status).includes(novoStatus)) {
+    toast('Não tem permissão para esta mudança de status', { type: 'error', autoClose: 2500 })
+    fecharModal('confirmarStatusModal')
+    return
+  }
 
   confirmandoStatus.value = true
   try {
@@ -1211,8 +1306,25 @@ const confirmarMudancaStatus = async () => {
 const formatarData = (d) => new Date(d).toLocaleString('pt-PT')
 const formatarDataCurta = (d) => (d ? new Date(d).toLocaleDateString('pt-PT') : '—')
 
+
+// Considera "atrasado" um pedido cujo prazo de entrega já passou e que ainda não foi
+// entregue nem cancelado (esses dois são estados finais, não fazem sentido como atraso).
+const pedidoAtrasado = (pedido) => {
+  if (!pedido?.dataEntregaPrevista) return false
+  if (['entregue', 'cancelado'].includes(pedido.status)) return false
+  const prazo = new Date(pedido.dataEntregaPrevista)
+  prazo.setHours(23, 59, 59, 999) // só conta atrasado depois de passar o dia inteiro do prazo
+  return prazo < new Date()
+}
+
 // --- Geração de Factura/Recibo em PDF, com código de barras do Nº Pedido ---
+// Só caixa/administrador podem gerar a factura/recibo
 const gerarFacturaPedido = async (pedidoResumido) => {
+  if (!podeGerirPedidos.value) {
+    toast('Apenas caixa e administrador podem gerar factura/recibo', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   try {
     // Se já veio com especificações carregadas (ex: já está aberto em Detalhes), não busca de novo.
     const pedido = pedidoResumido.especificacoes ? pedidoResumido : await store.dispatch('getPedido', pedidoResumido._id)
@@ -1222,9 +1334,9 @@ const gerarFacturaPedido = async (pedidoResumido) => {
   }
 }
 // Dados impressos no cabeçalho da factura (junto de NOME_GRAFICA e NIF_GRAFICA)
-const ENDERECO_GRAFICA = 'Bairro: Agustinho Neto, Rua da praça da cidade, Lunda-sul'
-const EMAIL_GRAFICA = 'geral@exemplo.com' // TODO: colocar o e-mail real
-const TELEFONE_GRAFICA = '+244 900 000 000' // TODO: colocar o telefone real
+const ENDERECO_GRAFICA = 'Bairro: Agustinho Neto, Rua: Deolinda Rodrigues , Lunda-sul'
+const EMAIL_GRAFICA = 'casimiroquiala2010@hotmail.com' // TODO: colocar o e-mail real
+const TELEFONE_GRAFICA = '+244 936 721 489' // TODO: colocar o telefone real
 
 const montarPDFFactura = (pedido) => {
   // Código de barras (CODE128) com o número do pedido, desenhado num canvas oculto
@@ -1299,6 +1411,8 @@ const montarPDFFactura = (pedido) => {
   y += 4
   doc.text(`Data de emissão: ${new Date().toLocaleDateString('pt-PT')}`, M, y)
   y += 4
+  doc.text(`Funcionário: ${usuarioLogado.value.nomeCompleto || '-'}`, M, y)
+  y += 4
 
   doc.line(M, y, DIREITA, y)
   y += 5
@@ -1321,44 +1435,49 @@ const montarPDFFactura = (pedido) => {
   }
 
   doc.line(M, y, DIREITA, y)
-  y += 2
+  y += 5
 
-  // Item do pedido (tabela compacta para o formato estreito)
-  autoTable(doc, {
-    startY: y,
-    margin: { left: M, right: M },
-    head: [['Descrição', 'Qtd', 'Total']],
-    body: [[
-      `${pedido.tipoProduto || '-'}\n${pedido.produto?.nome || '-'}\nUnit.: ${formatarMoeda(pedido.precoUnitario)}`,
-      String(pedido.quantidade ?? '-'),
-      formatarMoeda(totalPedido),
-    ]],
-    styles: { fontSize: 7, cellPadding: 1.5 },
-    headStyles: { fillColor: [32, 29, 26] },
-    columnStyles: {
-      0: { cellWidth: 38 },
-      1: { cellWidth: 10, halign: 'center' },
-      2: { cellWidth: 22, halign: 'right' },
-    },
-  })
+  // Item do pedido (layout em texto, sem tabela)
+  doc.setFontSize(8)
+  doc.setFont(undefined, 'bold')
+  doc.text('Descrição', M, y)
+  y += 4
+  doc.setFont(undefined, 'normal')
+  const linhasItem = doc.splitTextToSize(
+    `${pedido.tipoProduto || '-'} — ${pedido.produto?.nome || '-'}`,
+    LARGURA - 2 * M
+  )
+  doc.text(linhasItem, M, y)
+  y += linhasItem.length * 3.5 + 1
 
-  let finalY = doc.lastAutoTable?.finalY || y + 20
+  // Preço unitário "puro" e eventual acréscimo de serviço, agora lidos directamente do campo
+  // pedido.valorAdicionalServico (guardado na criação do pedido) — não dependem do produto vir
+  // populado nem do preço actual do catálogo, por isso já não falham em mostrar o acréscimo.
+  // O Total continua a ser calculado exactamente como antes, a partir de pedido.valorTotal.
+  const adicionalUnit = Number(pedido.valorAdicionalServico) || 0
+  const temAdicional = adicionalUnit > 0
+  const precoBaseUnit = temAdicional
+    ? Number(pedido.precoUnitario) - adicionalUnit
+    : Number(pedido.precoUnitario)
+
+  doc.text(`Preço unit.: ${formatarMoeda(precoBaseUnit)}`, M, y)
+  y += 4
+  if (temAdicional) {
+    doc.text(`Serviço adicional: +${formatarMoeda(adicionalUnit)} / un.`, M, y)
+    y += 4
+  }
+  doc.text(`Quantidade: ${pedido.quantidade ?? '-'}`, M, y)
+  y += 5
+
+  doc.line(M, y, DIREITA, y)
+
+  let finalY = y
 
   // Total
   doc.setFontSize(10)
   doc.setFont(undefined, 'bold')
   doc.text(`Total: ${formatarMoeda(totalPedido)}`, DIREITA, finalY + 7, { align: 'right' })
   finalY += 7
-
-  // Observações
-  if (pedido.observacoes) {
-    doc.setFontSize(8)
-    doc.setFont(undefined, 'normal')
-    doc.text('Observações:', M, finalY + 8)
-    const linhas = doc.splitTextToSize(pedido.observacoes, LARGURA - 2 * M)
-    doc.text(linhas, M, finalY + 12)
-    finalY += 12 + linhas.length * 3.5
-  }
 
   // Código de barras do Nº Pedido (centrado)
   const barW = 60
@@ -1414,8 +1533,13 @@ const montarPDFFactura = (pedido) => {
   margin-top: 0.15rem;
 }
 
-.text-ink { color: var(--ink); }
-.text-rule { color: var(--rule); }
+.text-ink {
+  color: var(--ink);
+}
+
+.text-rule {
+  color: var(--rule);
+}
 
 .num {
   font-family: 'IBM Plex Mono', monospace;
@@ -1431,27 +1555,87 @@ const montarPDFFactura = (pedido) => {
   border: 1px solid var(--paper-line);
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
-.stat-tab { position: absolute; top: 0; left: 0; width: 100%; height: 4px; }
 
-.stat-blue { background: #eaf1ff; border-color: #c7dbff; }
-.stat-blue .stat-tab { background: var(--blue); }
-.stat-blue .stat-value { color: #1d4ed8; }
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
 
-.stat-rose { background: #fff0f1; border-color: #ffd0d4; }
-.stat-rose .stat-tab { background: var(--rule); }
-.stat-rose .stat-value { color: #be123c; }
+.stat-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
 
-.stat-emerald { background: #ecfdf5; border-color: #bdf0d6; }
-.stat-emerald .stat-tab { background: var(--ok); }
-.stat-emerald .stat-value { color: #047857; }
+.stat-blue {
+  background: #eaf1ff;
+  border-color: #c7dbff;
+}
 
-.stat-amber { background: #fff8e8; border-color: #fbe2a6; }
-.stat-amber .stat-tab { background: var(--amber); }
-.stat-amber .stat-value { color: #b45309; }
+.stat-blue .stat-tab {
+  background: var(--blue);
+}
 
-.stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-top: 0.4rem; }
-.stat-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 1.5rem; color: var(--ink); margin-top: 0.15rem; }
+.stat-blue .stat-value {
+  color: #1d4ed8;
+}
+
+.stat-rose {
+  background: #fff0f1;
+  border-color: #ffd0d4;
+}
+
+.stat-rose .stat-tab {
+  background: var(--rule);
+}
+
+.stat-rose .stat-value {
+  color: #be123c;
+}
+
+.stat-emerald {
+  background: #ecfdf5;
+  border-color: #bdf0d6;
+}
+
+.stat-emerald .stat-tab {
+  background: var(--ok);
+}
+
+.stat-emerald .stat-value {
+  color: #047857;
+}
+
+.stat-amber {
+  background: #fff8e8;
+  border-color: #fbe2a6;
+}
+
+.stat-amber .stat-tab {
+  background: var(--amber);
+}
+
+.stat-amber .stat-value {
+  color: #b45309;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-top: 0.4rem;
+}
+
+.stat-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--ink);
+  margin-top: 0.15rem;
+}
 
 /* Abas */
 .tabs-bar {
@@ -1474,16 +1658,24 @@ const montarPDFFactura = (pedido) => {
   color: var(--ink-soft);
   transition: all 0.15s;
 }
-.tab-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.tab-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
 
 .tab-count {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.7rem;
-  background: rgba(0,0,0,0.08);
+  background: rgba(0, 0, 0, 0.08);
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
 }
-.tab-btn.active .tab-count { background: rgba(255,255,255,0.2); }
+
+.tab-btn.active .tab-count {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 .ledger-input {
   width: 100%;
@@ -1495,10 +1687,26 @@ const montarPDFFactura = (pedido) => {
   color: var(--ink);
   outline: none;
 }
-.ledger-input:focus { border-color: var(--ink); }
-.ledger-input:disabled { background: #f1efe9; color: #6b655c; cursor: not-allowed; }
-.input-invalid { border-color: var(--rule) !important; }
-.error-text { color: var(--rule); font-size: 0.75rem; margin-top: 0.25rem; }
+
+.ledger-input:focus {
+  border-color: var(--ink);
+}
+
+.ledger-input:disabled {
+  background: #f1efe9;
+  color: #6b655c;
+  cursor: not-allowed;
+}
+
+.input-invalid {
+  border-color: var(--rule) !important;
+}
+
+.error-text {
+  color: var(--rule);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
 
 .selector-btn {
   display: flex;
@@ -1507,7 +1715,11 @@ const montarPDFFactura = (pedido) => {
   text-align: left;
   cursor: pointer;
 }
-.selector-arrow { color: var(--ink-soft); font-size: 0.8rem; }
+
+.selector-arrow {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
 
 .link-clear {
   display: inline-block;
@@ -1525,7 +1737,15 @@ const montarPDFFactura = (pedido) => {
   margin-bottom: 1rem;
 }
 
-.search-icon { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--ink-soft); }
+.search-icon {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--ink-soft);
+}
 
 .ledger-label {
   display: block;
@@ -1538,139 +1758,461 @@ const montarPDFFactura = (pedido) => {
 }
 
 /* Painel/tabela */
-.ledger-panel { background: #fff; border: 1px solid var(--paper-line); border-radius: 12px; overflow: hidden; }
-.ledger-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.ledger-table thead th {
-  text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--ink-soft); background: var(--paper); padding: 0.65rem 1rem; border-bottom: 2px solid var(--ink);
+.ledger-panel {
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+  overflow: hidden;
 }
-.ledger-table tbody td { padding: 0.75rem 1rem; border-bottom: 1px dashed var(--paper-line); vertical-align: middle; }
-.ledger-table tbody tr:last-child td { border-bottom: none; }
-.ledger-table tbody tr td:first-child { border-left: 3px solid var(--rule); }
-.row-clickable { cursor: pointer; }
-.row-clickable:hover { background: #fbfaf6; }
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ledger-table thead th {
+  text-align: left;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0.65rem 1rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.ledger-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px dashed var(--paper-line);
+  vertical-align: middle;
+}
+
+.ledger-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ledger-table tbody tr td:first-child {
+  border-left: 3px solid var(--rule);
+}
+
+.row-clickable {
+  cursor: pointer;
+}
+
+.row-clickable:hover {
+  background: #fbfaf6;
+}
 
 /* Badges de status */
 .status-badge {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  font-size: 0.78rem; font-weight: 600; padding: 0.2rem 0.65rem; border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
 }
-.status-badge.lg { font-size: 0.9rem; padding: 0.35rem 0.9rem; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 
-.badge-pendente { background: #fff0f1; color: var(--rule); }
-.badge-em_execucao { background: #eaf1ff; color: var(--blue); }
-.badge-pronto { background: #fff8e8; color: var(--amber); }
-.badge-entregue { background: #ecfdf5; color: var(--ok); }
-.badge-cancelado { background: #f1efe9; color: #8a8478; }
+.status-badge.lg {
+  font-size: 0.9rem;
+  padding: 0.35rem 0.9rem;
+}
 
-.status-dot-inline { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 0.35rem; }
-.dot-pendente { background: var(--rule); }
-.dot-em_execucao { background: var(--blue); }
-.dot-pronto { background: var(--amber); }
-.dot-entregue { background: var(--ok); }
-.dot-cancelado { background: #8a8478; }
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-pendente {
+  background: #fff0f1;
+  color: var(--rule);
+}
+
+.badge-em_execucao {
+  background: #eaf1ff;
+  color: var(--blue);
+}
+
+.badge-pronto {
+  background: #fff8e8;
+  color: var(--amber);
+}
+
+.badge-entregue {
+  background: #ecfdf5;
+  color: var(--ok);
+}
+
+.badge-cancelado {
+  background: #f1efe9;
+  color: #8a8478;
+}
+
+.status-dot-inline {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+}
+
+.dot-pendente {
+  background: var(--rule);
+}
+
+.dot-em_execucao {
+  background: var(--blue);
+}
+
+.dot-pronto {
+  background: var(--amber);
+}
+
+.dot-entregue {
+  background: var(--ok);
+}
+
+.dot-cancelado {
+  background: #8a8478;
+}
 
 .btn-icon {
-  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px; border: 1px solid var(--paper-line); background: #fff; color: var(--ink-soft);
-  margin-left: 0.25rem; font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  color: var(--ink-soft);
+  margin-left: 0.25rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
 }
-.btn-icon:hover { border-color: var(--ink); color: var(--ink); }
-.btn-icon.btn-ok:hover { border-color: var(--ok); color: var(--ok); }
-.btn-icon.btn-rule:hover { border-color: var(--rule); color: var(--rule); }
-.btn-icon.btn-blue:hover { border-color: var(--blue); color: var(--blue); }
-.btn-icon.btn-amber:hover { border-color: var(--amber); color: var(--amber); }
+
+.btn-icon:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-icon.btn-ok:hover {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.btn-icon.btn-rule:hover {
+  border-color: var(--rule);
+  color: var(--rule);
+}
+
+.btn-icon.btn-blue:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.btn-icon.btn-amber:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
 
 .ledger-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.85rem 1rem; border-top: 1px solid var(--paper-line); background: var(--paper);
-  font-size: 0.8rem; color: var(--ink-soft); flex-wrap: wrap; gap: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--paper-line);
+  background: var(--paper);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  flex-wrap: wrap;
+  gap: 1rem;
 }
+
 .page-btn {
-  min-width: 32px; height: 32px; padding: 0 0.6rem; border-radius: 6px; border: 1px solid var(--paper-line);
-  background: #fff; font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
 }
-.page-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-.page-btn:disabled { opacity: 0.45; }
+
+.page-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+}
 
 /* Botões */
 .btn-primary {
-  background: var(--ink); color: #fff; border: 1px solid var(--ink); border-radius: 8px;
-  padding: 0.55rem 1.1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
 }
-.btn-primary:disabled { opacity: 0.55; }
+
+.btn-primary:disabled {
+  opacity: 0.55;
+}
+
 .btn-ghost {
-  background: transparent; border: 1px solid var(--paper-line); color: var(--ink-soft); border-radius: 8px;
-  padding: 0.5rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--paper-line);
+  color: var(--ink-soft);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
 }
-.btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
-.btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* Ilustrações / imagens do pedido */
 .dropzone {
-  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-  padding: 1rem; text-align: center; font-size: 0.85rem; color: var(--ink-soft);
-  border: 1px dashed var(--paper-line); border-radius: 8px; background: var(--paper); cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  border: 1px dashed var(--paper-line);
+  border-radius: 8px;
+  background: var(--paper);
+  cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.dropzone:hover, .dropzone-over { border-color: var(--rule); background: #fdf1f0; }
-.dropzone small { opacity: 0.7; }
+
+.dropzone:hover,
+.dropzone-over {
+  border-color: var(--rule);
+  background: #fdf1f0;
+}
+
+.dropzone small {
+  opacity: 0.7;
+}
 
 .anexos-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
-.anexo-item { position: relative; margin: 0; }
+
+.anexo-item {
+  position: relative;
+  margin: 0;
+}
+
 .anexo-item img {
-  display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
-  border: 1px solid var(--paper-line); border-radius: 8px; background: var(--paper);
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  background: var(--paper);
 }
+
 .anexo-remove {
-  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--ink); color: #fff; font-size: 0.65rem; line-height: 1; cursor: pointer;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.65rem;
+  line-height: 1;
+  cursor: pointer;
 }
-.anexo-remove:hover { background: var(--rule); }
-.anexo-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.anexo-remove:hover {
+  background: var(--rule);
+}
+
+.anexo-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .anexo-ok {
-  position: absolute; bottom: 6px; left: 6px; width: 20px; height: 20px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--ok); color: #fff; font-size: 0.7rem;
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ok);
+  color: #fff;
+  font-size: 0.7rem;
 }
+
 .anexo-download {
-  display: inline-block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--rule); text-decoration: underline;
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--rule);
+  text-decoration: underline;
 }
+
 .anexo-badge {
-  display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px;
-  font-size: 0.72rem; font-weight: 600; color: var(--rule); background: #fdf1f0;
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--rule);
+  background: #fdf1f0;
 }
-.anexos-detalhe { border-top: 1px dashed var(--paper-line); padding: 1rem 0; margin-bottom: 0.5rem; }
-.anexos-existentes { padding-bottom: 0.25rem; }
+
+.anexos-detalhe {
+  border-top: 1px dashed var(--paper-line);
+  padding: 1rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.anexos-existentes {
+  padding-bottom: 0.25rem;
+}
 
 /* Detalhes */
 .detalhe-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem 1.5rem; margin-bottom: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.25rem;
 }
-.detalhe-grid .col-span-2 { grid-column: 1 / -1; }
-.detalhe-grid dt { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-bottom: 0.15rem; }
-.detalhe-grid dd { font-size: 0.9rem; color: var(--ink); }
 
-.historico { border-top: 1px dashed var(--paper-line); padding-top: 1rem; }
-.form-section-title {
-  font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--rule); margin-bottom: 0.75rem;
+.detalhe-grid .col-span-2 {
+  grid-column: 1 / -1;
 }
-.historico ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.6rem; }
-.historico li { font-size: 0.85rem; }
+
+.detalhe-grid dt {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-bottom: 0.15rem;
+}
+
+.detalhe-grid dd {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.historico {
+  border-top: 1px dashed var(--paper-line);
+  padding-top: 1rem;
+}
+
+.form-section-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rule);
+  margin-bottom: 0.75rem;
+}
+
+.historico ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.historico li {
+  font-size: 0.85rem;
+}
 
 /* Modais */
-:deep(.ledger-modal.modal-content) { border-radius: 12px; border: none; box-shadow: 0 20px 40px -8px rgba(32,29,26,0.25); }
-:deep(.ledger-modal .modal-header), :deep(.ledger-modal .modal-footer) { border-color: var(--paper-line); padding: 1.1rem 1.4rem; }
-:deep(.ledger-modal .modal-title) { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--ink); }
-:deep(.ledger-modal .modal-body) { padding: 1.4rem; max-height: 70vh; overflow-y: auto; }
+:deep(.ledger-modal.modal-content) {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 20px 40px -8px rgba(32, 29, 26, 0.25);
+}
+
+:deep(.ledger-modal .modal-header),
+:deep(.ledger-modal .modal-footer) {
+  border-color: var(--paper-line);
+  padding: 1.1rem 1.4rem;
+}
+
+:deep(.ledger-modal .modal-title) {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+:deep(.ledger-modal .modal-body) {
+  padding: 1.4rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
 
 .spinner {
-  width: 28px; height: 28px; border: 3px solid var(--paper-line); border-top-color: var(--ink);
-  border-radius: 50%; margin: 0 auto; animation: spin 0.8s linear infinite;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--paper-line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 0.8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+.atraso-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--rule);
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

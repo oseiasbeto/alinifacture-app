@@ -70,6 +70,7 @@ export default {
                 const res = await api.post("/utilizadores/login", { email, palavraPasse: password });
                 const { utilizador: user, accessToken, sessaoId } = res.data;
 
+                console.log(user)
                 commit('SET_AUTH', { user, accessToken, sessionId: sessaoId })
                 return res
             } catch (err) {

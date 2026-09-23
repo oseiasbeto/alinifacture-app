@@ -58,5 +58,15 @@ export default [
             title: 'Caixa | Painel de controlo',
         },
         component: () => import('./Layout.vue')
+    },
+    {
+        name: 'Utilizadores',
+        path: '/dashboard/utilizadores',
+        meta: {
+            requiresAuth: true,
+            rootPage: 'dashboard',
+            title: 'Utilizadores | Painel de controlo',
+        },
+        component: () => import('./Layout.vue') 
     }
 ]

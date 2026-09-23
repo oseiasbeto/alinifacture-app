@@ -41,6 +41,12 @@ export default {
         loadingPedidos: false,
         errorPedidos: null,
         resumoPedidos: null,
+
+        utilizadores: [],
+        paginationUtilizadores: { page: 1, limit: 10, totalDocs: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false },
+        loadingUtilizadores: false,
+        errorUtilizadores: null,
+        resumoUtilizadores: null,
     },
     mutations: {
         SET_DASHBOARD(state, data) { state.dashboard = data },
@@ -107,6 +113,13 @@ export default {
         SET_RESUMO_PEDIDOS(state, resumo) {
             state.resumoPedidos = resumo
         },
+        SET_UTILIZADORES(state, { docs, pagination }) {
+            state.utilizadores = docs
+            state.paginationUtilizadores = pagination
+        },
+        SET_LOADING_UTILIZADORES(state, v) { state.loadingUtilizadores = v },
+        SET_ERROR_UTILIZADORES(state, e) { state.errorUtilizadores = e },
+        SET_RESUMO_UTILIZADORES(state, resumo) { state.resumoUtilizadores = resumo },
     },
     actions: {
         async carregarDashboard({ commit }, { dataInicio, dataFim } = {}) {
@@ -440,6 +453,52 @@ export default {
                 throw err
             }
         },
+        async listarUtilizadores({ commit }, params = {}) {
+            commit('SET_LOADING_UTILIZADORES', true)
+            commit('SET_ERROR_UTILIZADORES', null)
+            try {
+                const res = await api.get('/utilizadores', { params })
+                commit('SET_UTILIZADORES', { docs: res.data.utilizadores || [], pagination: res.data.pagination || {} })
+            } catch (err) {
+                commit('SET_ERROR_UTILIZADORES', err.response?.data?.message || 'Erro ao carregar utilizadores')
+                throw err
+            } finally {
+                commit('SET_LOADING_UTILIZADORES', false)
+            }
+        },
+
+        async getUtilizador(_, id) {
+            const res = await api.get(`/utilizadores/${id}`)
+            return res.data.utilizador
+        },
+
+        // Retorna { utilizador, senhaGerada } — a senha só vem preenchida nesta resposta.
+        async criarUtilizador(_, payload) {
+            const res = await api.post('/utilizadores', payload)
+            return res.data
+        },
+
+        async atualizarUtilizador(_, { id, payload }) {
+            const res = await api.put(`/utilizadores/${id}`, payload)
+            return res.data.utilizador
+        },
+
+        // Retorna { senhaGerada }
+        async redefinirSenhaUtilizador(_, id) {
+            const res = await api.patch(`/utilizadores/${id}/redefinir-senha`)
+            return res.data
+        },
+
+        async eliminarUtilizador(_, id) {
+            const res = await api.delete(`/utilizadores/${id}`)
+            return res.data
+        },
+
+        async carregarResumoUtilizadores({ commit }) {
+            const res = await api.get('/utilizadores/resumo')
+            commit('SET_RESUMO_UTILIZADORES', res.data.resumo)
+            return res.data.resumo
+        },
     },
     getters: {
         // Getters úteis (opcional)
@@ -478,5 +537,11 @@ export default {
         pedidosLoading: (state) => state.loadingPedidos,
         pedidosError: (state) => state.errorPedidos,
         resumoPedidos: (state) => state.resumoPedidos,
+
+        utilizadoresListados: (state) => state.utilizadores,
+        utilizadoresPagination: (state) => state.pagination,
+        utilizadoresLoading: (state) => state.loadingUtilizadores,
+        utilizadoresError: (state) => state.errorUtilizadores,
+        resumoUtilizadores: (state) => state.resumoUtilizadores
     }
 }

@@ -107,7 +107,7 @@
         </table>
       </div>
 
-      <div class="ledger-footer" v-if="paginationNiveis?.totalPages >= 1">
+      <div class="ledger-footer" v-if="paginationNiveis?.totalPages > 1">
         <div>
           Mostrando {{ (paginationNiveis.page - 1) * paginationNiveis.limit + 1 }}–
           {{ Math.min(paginationNiveis.page * paginationNiveis.limit, paginationNiveis.totalDocs) }} de

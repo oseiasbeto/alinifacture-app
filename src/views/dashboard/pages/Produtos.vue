@@ -11,7 +11,8 @@
           @click="gerarPDFProdutos">
           ↓ Exportar
         </button>
-        <button class="btn-primary flex-1 sm:flex-none" @click="abrirModalNovo('novoProdutoModal')">
+        <button v-if="podeGerenciarProdutos" class="btn-primary flex-1 sm:flex-none"
+          @click="abrirModalNovo('novoProdutoModal')">
           + Novo Produto
         </button>
       </div>
@@ -91,7 +92,7 @@
                 <th class="text-left">Unidade</th>
                 <th class="text-right">Estoque</th>
                 <th class="text-left">Status</th>
-                <th class="text-right">Ações</th>
+                <th v-if="podeGerenciarProdutos" class="text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +127,7 @@
                   <span class="status-dot" :class="produto.ativo ? 'dot-ok' : 'dot-rule'"></span>
                   {{ produto.ativo ? 'Ativo' : 'Inativo' }}
                 </td>
-                <td data-label="Ações" class="actions-cell" @click.stop>
+                <td v-if="podeGerenciarProdutos" data-label="Ações" class="actions-cell" @click.stop>
                   <button class="btn-icon" title="Editar" @click="editarProduto(produto)">✎</button>
                   <button class="btn-icon btn-rule" title="Excluir" @click="confirmarExclusao(produto)">✕</button>
                 </td>
@@ -136,7 +137,7 @@
         </div>
 
         <!-- Paginação -->
-        <div class="ledger-footer">
+        <div class="ledger-footer" v-if="paginationInfo.totalPages > 1">
           <div>
             Mostrando {{ (paginationInfo.page - 1) * paginationInfo.limit + 1 }}–
             {{ Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.totalDocs) }} de
@@ -164,7 +165,7 @@
     </div>
 
     <!-- Modal Novo/Editar Produto -->
-    <div class="modal fade" id="novoProdutoModal" tabindex="-1" aria-hidden="true">
+    <div v-if="podeGerenciarProdutos" class="modal fade" id="novoProdutoModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg">
         <div class="modal-content ledger-modal">
           <div class="modal-header">
@@ -295,7 +296,7 @@
     </div>
 
     <!-- Modal Confirmação Exclusão -->
-    <div class="modal fade" id="confirmarExclusaoModal" tabindex="-1">
+    <div v-if="podeGerenciarProdutos" class="modal fade" id="confirmarExclusaoModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content ledger-modal">
           <div class="modal-header">
@@ -327,6 +328,18 @@ import autoTable from 'jspdf-autotable'
 const store = useStore()
 const router = useRouter()
 const route = useRoute()
+
+// Utilizador atual e permissão de gestão de produtos
+// Apenas "gerente" e "administrador" podem criar, editar ou excluir produtos.
+// Ajuste os valores abaixo se os cargos no teu sistema tiverem outra grafia.
+const user = computed(() => store.getters.currentUser)
+
+const CARGOS_PERMITIDOS = ['estoquista', 'administrador']
+
+const podeGerenciarProdutos = computed(() => {
+  const cargo = user.value?.cargo?.toLowerCase()
+  return CARGOS_PERMITIDOS.includes(cargo)
+})
 
 // Clique na linha da tabela -> abre a tela de detalhes do produto
 const abrirDetalhes = (produto) => {
@@ -525,13 +538,18 @@ onMounted(async () => {
 
   // Veio da tela de Detalhes do Produto clicando em "Editar Produto"
   if (route.query.editar) {
-    try {
-      const produto = await store.dispatch('getProduct', route.query.editar)
-      await editarProduto(produto)
-    } catch (err) {
-      toast('Não foi possível carregar o produto para edição', { type: 'error', autoClose: 2500 })
-    } finally {
-      router.replace({ path: '/produtos' }) // limpa a query da URL
+    if (!podeGerenciarProdutos.value) {
+      // Sem permissão: ignora o pedido de edição vindo pela URL
+      router.replace({ path: '/produtos' })
+    } else {
+      try {
+        const produto = await store.dispatch('getProduct', route.query.editar)
+        await editarProduto(produto)
+      } catch (err) {
+        toast('Não foi possível carregar o produto para edição', { type: 'error', autoClose: 2500 })
+      } finally {
+        router.replace({ path: '/produtos' }) // limpa a query da URL
+      }
     }
   }
 
@@ -586,12 +604,23 @@ const fecharModal = (modalId = 'novoProdutoModal') => {
   }
 };
 
+// Só gerente/administrador podem abrir o modal de criação de produto
 const abrirModalNovo = (modalId) => {
+  if (!podeGerenciarProdutos.value) {
+    toast('Apenas gerentes e administradores podem criar produtos', { type: 'error', autoClose: 2500 })
+    return
+  }
   resetForm()
   new Modal(document.getElementById(modalId)).show()
 }
 
+// Só gerente/administrador podem editar um produto existente
 const editarProduto = async (produto) => {
+  if (!podeGerenciarProdutos.value) {
+    toast('Apenas gerentes e administradores podem editar produtos', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   modoEdicao.value = true
   produtoSelecionado.value = produto
 
@@ -624,7 +653,13 @@ const validarFormulario = () => {
   return Object.keys(errors.value).length === 0
 }
 
+// Guarda de permissão aplicada tanto à criação como à edição
 const salvarProduto = async () => {
+  if (!podeGerenciarProdutos.value) {
+    toast('Apenas gerentes e administradores podem salvar produtos', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   if (!validarFormulario()) return;
 
   salvando.value = true;
@@ -680,12 +715,23 @@ const salvarProduto = async () => {
   }
 };
 
+// Só gerente/administrador podem abrir a confirmação de exclusão
 const confirmarExclusao = (produto) => {
+  if (!podeGerenciarProdutos.value) {
+    toast('Apenas gerentes e administradores podem excluir produtos', { type: 'error', autoClose: 2500 })
+    return
+  }
   produtoSelecionado.value = produto
   new Modal(document.getElementById('confirmarExclusaoModal')).show()
 }
 
+// Guarda de permissão também na execução efetiva da exclusão
 const excluirProduto = async () => {
+  if (!podeGerenciarProdutos.value) {
+    toast('Apenas gerentes e administradores podem excluir produtos', { type: 'error', autoClose: 2500 })
+    return
+  }
+
   if (!produtoSelecionado.value?._id) return;
 
   excluindo.value = true;
