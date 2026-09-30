@@ -16,6 +16,7 @@ export default {
             hasNextPage: false,
             hasPrevPage: false
         },
+        totaisCompras: {},
         loadingProdutos: false,
         loadingClientes: false,
         resumoProdutos: null,
@@ -56,6 +57,7 @@ export default {
             state.produtos = docs
             state.pagination = pagination
         },
+        SET_TOTAIS_COMPRAS(state, totais) { state.totaisCompras = totais || {} },
         SET_PRODUTO(state, produto) {
             state.produto = produto
         },
@@ -202,6 +204,25 @@ export default {
                 console.error('Erro ao carregar resumo de clientes:', err.message)
                 throw err
             }
+        },
+
+        async carregarTotaisCompras({ commit }, ids = []) {
+            if (!ids.length) { commit('SET_TOTAIS_COMPRAS', {}); return {} }
+            try {
+                const res = await api.get('/clientes/compras/totais', { params: { ids: ids.join(',') } })
+                commit('SET_TOTAIS_COMPRAS', res.data.totais)
+                return res.data.totais
+            } catch (err) {
+                commit('SET_TOTAIS_COMPRAS', {})
+                console.error('Erro ao carregar totais de compras:', err.message)
+                throw err
+            }
+        },
+
+        // Devolve os dados directamente (como getPedido), porque o estado vive só no modal
+        async carregarComprasCliente(_, { id, ...params }) {
+            const res = await api.get(`/clientes/${id}/compras`, { params })
+            return res.data
         },
 
         // NOVA action: buscar um único produto por id (usada na tela de detalhes)
@@ -471,6 +492,10 @@ export default {
             const res = await api.get(`/utilizadores/${id}`)
             return res.data.utilizador
         },
+        async receberOrdemSaque(_, { id, dataRecebimento, observacao }) {
+            const res = await api.patch(`/pedidos/${id}/ordem-saque/receber`, { dataRecebimento, observacao })
+            return res.data.pedido
+        },
 
         // Retorna { utilizador, senhaGerada } — a senha só vem preenchida nesta resposta.
         async criarUtilizador(_, payload) {
@@ -482,6 +507,10 @@ export default {
             const res = await api.put(`/utilizadores/${id}`, payload)
             return res.data.utilizador
         },
+        async alterarMinhaSenha(_, { senhaAtual, novaSenha }) {
+            const res = await api.patch('/utilizadores/minha-senha', { senhaAtual, novaSenha })
+            return res.data
+        },
 
         // Retorna { senhaGerada }
         async redefinirSenhaUtilizador(_, id) {
@@ -492,6 +521,10 @@ export default {
         async eliminarUtilizador(_, id) {
             const res = await api.delete(`/utilizadores/${id}`)
             return res.data
+        },
+        async carregarRanking(_, params = {}) {
+            const res = await api.get('/utilizadores/ranking', { params })
+            return res.data // { ranking, papel, periodo }
         },
 
         async carregarResumoUtilizadores({ commit }) {
@@ -542,6 +575,7 @@ export default {
         utilizadoresPagination: (state) => state.pagination,
         utilizadoresLoading: (state) => state.loadingUtilizadores,
         utilizadoresError: (state) => state.errorUtilizadores,
-        resumoUtilizadores: (state) => state.resumoUtilizadores
+        resumoUtilizadores: (state) => state.resumoUtilizadores,
+        totaisCompras: (state) => state.totaisCompras,
     }
 }

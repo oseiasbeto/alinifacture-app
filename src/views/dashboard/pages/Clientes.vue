@@ -84,16 +84,17 @@
               <th class="text-left">Endereço</th>
               <th class="text-left">Cidade/Província</th>
               <th class="text-left">Tipo</th>
+              <th class="text-left">Compras</th>
               <th class="text-left">Status</th>
               <th v-if="podeGerirClientes" class="text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cliente in clientesListados" :key="cliente._id">
+            <tr @click="abrirDetalhes(cliente)" v-for="cliente in clientesListados" :key="cliente._id">
               <td>
                 <div class="font-medium text-ink">{{ cliente.nome }}</div>
                 <div class="text-xs text-stone-500 truncate max-w-[180px]">{{ cliente.observacoes || 'Sem observações'
-                  }}</div>
+                }}</div>
               </td>
               <td class="text-stone-500">{{ cliente.email || '—' }}</td>
               <td class="text-stone-500 num">{{ cliente.telefone || '—' }}</td>
@@ -102,10 +103,15 @@
               <td class="text-stone-500">{{ cliente.cidade }} / {{ cliente.provincia }}</td>
               <td class="text-stone-500 capitalize">{{ cliente.tipo }}</td>
               <td>
+                <div class="num text-ink">{{  kz(totais[cliente._id]?.valorTotal) }}</div>
+                <div class="text-xs text-stone-500"> {{ totais[cliente._id]?.totalPedidos || 0 }} pedido(s)</div>
+              </td>
+              <td>
                 <span class="status-dot" :class="cliente.ativo ? 'dot-ok' : 'dot-rule'"></span>
                 {{ cliente.ativo ? 'Ativo' : 'Inativo' }}
               </td>
-              <td v-if="podeGerirClientes" class="text-right whitespace-nowrap">
+              <td @click.stop v-if="podeGerirClientes" class="text-right whitespace-nowrap">
+                <button class="btn-icon" title="Ver detalhes" @click="abrirDetalhes(cliente)">👁</button>
                 <button class="btn-icon" title="Editar" @click="editarCliente(cliente)">✎</button>
                 <button class="btn-icon btn-rule" title="Excluir" @click="confirmarExclusao(cliente)">🗑</button>
               </td>
@@ -229,7 +235,8 @@
     </div>
 
     <!-- Modal Confirmação Exclusão -->
-    <div v-if="podeGerirClientes" class="modal fade" id="confirmarExclusaoClienteModal" tabindex="-1" aria-hidden="true">
+    <div v-if="podeGerirClientes" class="modal fade" id="confirmarExclusaoClienteModal" tabindex="-1"
+      aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content ledger-modal">
           <div class="modal-header">
@@ -250,6 +257,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Detalhes do Cliente -->
+    <ClienteDetalhesModal ref="detalhesRef" />
   </div>
 </template>
 
@@ -261,6 +271,7 @@ import axios from 'axios'
 import { toast } from "vue3-toastify"
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import ClienteDetalhesModal from '../components/Clientedetalhesmodal.vue'
 
 const store = useStore()
 
@@ -397,6 +408,21 @@ const fecharModal = (modalId) => {
     if (modalId === 'novoClienteModal') resetForm()
   }
 }
+
+const detalhesRef = ref(null)
+const totais = computed(() => store.getters.totaisCompras || {})
+
+const kz = (v) => `${new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v) || 0)}kz`
+  
+const abrirDetalhes = (cliente) => detalhesRef.value.abrir(cliente)
+
+// depois de declarar clientesListados
+watch(clientesListados, (lista) => {
+  store.dispatch('carregarTotaisCompras', lista.map((c) => c._id)).catch(() => { })
+}, { immediate: true })
 
 const resetForm = () => {
   form.value = {

@@ -27,19 +27,51 @@
         <!-- Lado Direito -->
         <div class="flex items-center gap-2 sm:gap-3">
           <!-- Notificações -->
-          <button class="icon-btn hidden sm:flex" aria-label="Notificações">
-            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-              <path v-for="(d, i) in icons.bell" :key="i" :d="d" />
-            </svg>
-            <span class="notif-dot"></span>
-          </button>
+          <div class="relative hidden sm:block" ref="notifRef">
+            <button class="icon-btn flex" aria-label="Notificações" aria-haspopup="menu" :aria-expanded="notifOpen"
+              @click="toggleNotif">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path v-for="(d, i) in icons.bell" :key="i" :d="d" />
+              </svg>
+              <span v-if="temNaoLidas" class="notif-dot"></span>
+            </button>
+
+            <Transition name="pop">
+              <div v-if="notifOpen" class="notif-dropdown" role="menu">
+                <div class="dropdown-head">
+                  <p class="dropdown-name">Notificações</p>
+                </div>
+                <div class="dropdown-rule"></div>
+
+                <!-- Lista (será preenchida quando existirem notificações) -->
+                <ul v-if="notificacoes.length" class="notif-list">
+                  <li v-for="n in notificacoes" :key="n.id" class="notif-item"
+                    :class="{ 'notif-item-unread': !n.lida }">
+                    <p class="notif-item-title">{{ n.titulo }}</p>
+                    <p class="notif-item-text">{{ n.mensagem }}</p>
+                    <span class="notif-item-time">{{ formatarData(n.data) }}</span>
+                  </li>
+                </ul>
+
+                <!-- Estado vazio -->
+                <div v-else class="notif-empty">
+                  <span class="notif-empty-ico">
+                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path v-for="(d, i) in icons.bell" :key="i" :d="d" />
+                    </svg>
+                  </span>
+                  <p class="notif-empty-title">Sem notificações</p>
+                  <p class="notif-empty-text">Não há nenhuma notificação por enquanto.</p>
+                </div>
+              </div>
+            </Transition>
+          </div>
 
           <span class="nav-divider hidden sm:block" aria-hidden="true"></span>
 
           <!-- Menu do Usuário -->
-          <div class="relative">
-            <button @click="userMenuOpen = !userMenuOpen" class="user-trigger" aria-haspopup="menu"
-              :aria-expanded="userMenuOpen">
+          <div class="relative" ref="userMenuRef">
+            <button @click="toggleUserMenu" class="user-trigger" aria-haspopup="menu" :aria-expanded="userMenuOpen">
               <span class="user-avatar">{{ iniciais }}</span>
               <span class="user-text hidden lg:flex flex-col">
                 <span class="user-name truncate">{{ user?.nomeCompleto }}</span>
@@ -129,57 +161,99 @@
               </span>
             </div>
 
-            <!-- Informações -->
-            <dl class="perfil-lista">
-              <div class="perfil-linha">
-                <span class="perfil-ico">
-                  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-                    <path v-for="(d, i) in icons.mail" :key="i" :d="d" />
-                  </svg>
-                </span>
-                <div class="perfil-info">
-                  <dt>Email</dt>
-                  <dd>{{ user?.email || '-' }}</dd>
+            <!-- Vista: Informações -->
+            <template v-if="perfilView === 'info'">
+              <dl class="perfil-lista">
+                <div class="perfil-linha">
+                  <span class="perfil-ico">
+                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path v-for="(d, i) in icons.mail" :key="i" :d="d" />
+                    </svg>
+                  </span>
+                  <div class="perfil-info">
+                    <dt>Email</dt>
+                    <dd>{{ user?.email || '-' }}</dd>
+                  </div>
                 </div>
-              </div>
-              <div class="perfil-linha">
-                <span class="perfil-ico">
-                  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-                    <path v-for="(d, i) in icons.phone" :key="i" :d="d" />
-                  </svg>
-                </span>
-                <div class="perfil-info">
-                  <dt>Telefone</dt>
-                  <dd>{{ user?.telefone || '-' }}</dd>
+                <div class="perfil-linha">
+                  <span class="perfil-ico">
+                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path v-for="(d, i) in icons.phone" :key="i" :d="d" />
+                    </svg>
+                  </span>
+                  <div class="perfil-info">
+                    <dt>Telefone</dt>
+                    <dd>{{ user?.telefone || '-' }}</dd>
+                  </div>
                 </div>
-              </div>
-              <div class="perfil-linha">
-                <span class="perfil-ico">
-                  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-                    <path v-for="(d, i) in icons.briefcase" :key="i" :d="d" />
-                  </svg>
-                </span>
-                <div class="perfil-info">
-                  <dt>Cargo</dt>
-                  <dd class="capitalize">{{ user?.cargo || '-' }}</dd>
+                <div class="perfil-linha">
+                  <span class="perfil-ico">
+                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path v-for="(d, i) in icons.briefcase" :key="i" :d="d" />
+                    </svg>
+                  </span>
+                  <div class="perfil-info">
+                    <dt>Cargo</dt>
+                    <dd class="capitalize">{{ user?.cargo || '-' }}</dd>
+                  </div>
                 </div>
-              </div>
-              <div class="perfil-linha">
-                <span class="perfil-ico">
-                  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-                    <path v-for="(d, i) in icons.clock" :key="i" :d="d" />
-                  </svg>
-                </span>
-                <div class="perfil-info">
-                  <dt>Último acesso</dt>
-                  <dd>{{ formatarData(user?.ultimoLogin) }}</dd>
+                <div class="perfil-linha">
+                  <span class="perfil-ico">
+                    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path v-for="(d, i) in icons.clock" :key="i" :d="d" />
+                    </svg>
+                  </span>
+                  <div class="perfil-info">
+                    <dt>Último acesso</dt>
+                    <dd>{{ formatarData(user?.ultimoLogin) }}</dd>
+                  </div>
                 </div>
-              </div>
-            </dl>
+              </dl>
 
-            <div class="perfil-footer">
-              <button class="perfil-btn" @click="fecharPerfil">Fechar</button>
-            </div>
+              <div class="perfil-footer">
+                <button class="perfil-btn perfil-btn-ghost" @click="abrirRedefinirSenha">
+                  <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                    <path v-for="(d, i) in icons.lock" :key="i" :d="d" />
+                  </svg>
+                  Redefinir senha
+                </button>
+                <button class="perfil-btn" @click="fecharPerfil">Fechar</button>
+              </div>
+            </template>
+
+            <!-- Vista: Redefinir senha -->
+            <form v-else class="perfil-form" @submit.prevent="salvarSenha" novalidate>
+              <p class="perfil-form-title">Redefinir senha</p>
+
+              <label class="campo">
+                <span class="campo-label">Senha atual</span>
+                <input v-model="senhaForm.senhaAtual" type="password" class="campo-input"
+                  autocomplete="current-password" :disabled="senhaLoading" />
+              </label>
+
+              <label class="campo">
+                <span class="campo-label">Nova senha</span>
+                <input v-model="senhaForm.novaSenha" type="password" class="campo-input"
+                  autocomplete="new-password" :disabled="senhaLoading" />
+              </label>
+
+              <label class="campo">
+                <span class="campo-label">Confirmar nova senha</span>
+                <input v-model="senhaForm.confirmar" type="password" class="campo-input"
+                  autocomplete="new-password" :disabled="senhaLoading" />
+              </label>
+
+              <p v-if="senhaErro" class="msg msg-erro" role="alert">{{ senhaErro }}</p>
+              <p v-if="senhaSucesso" class="msg msg-ok" role="status">{{ senhaSucesso }}</p>
+
+              <div class="perfil-footer perfil-footer-form">
+                <button type="button" class="perfil-btn perfil-btn-ghost" :disabled="senhaLoading"
+                  @click="voltarPerfil">Voltar</button>
+                <button type="submit" class="perfil-btn" :disabled="senhaLoading">
+                  {{ senhaLoading ? 'A guardar...' : 'Guardar senha' }}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </Transition>
@@ -188,7 +262,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import Cookies from "js-cookie"
@@ -202,7 +276,41 @@ const mobileMenuOpen = ref(false)
 const userMenuOpen = ref(false)
 const perfilOpen = ref(false)
 
+const notifOpen = ref(false)
+const notifRef = ref(null)
+const userMenuRef = ref(null)
+
 const sessionId = Cookies.get("session_id")
+
+// Futuramente: preencher com as notificações vindas do store/API
+// Formato esperado: { id, titulo, mensagem, data, lida }
+const notificacoes = ref([])
+const temNaoLidas = computed(() => notificacoes.value.some(n => !n.lida))
+
+const toggleNotif = () => {
+  userMenuOpen.value = false
+  notifOpen.value = !notifOpen.value
+}
+
+const toggleUserMenu = () => {
+  notifOpen.value = false
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+// Redefinir senha
+const perfilView = ref('info') // 'info' | 'senha'
+const senhaLoading = ref(false)
+const senhaErro = ref('')
+const senhaSucesso = ref('')
+const senhaForm = reactive({ senhaAtual: '', novaSenha: '', confirmar: '' })
+
+const limparFormSenha = () => {
+  senhaForm.senhaAtual = ''
+  senhaForm.novaSenha = ''
+  senhaForm.confirmar = ''
+  senhaErro.value = ''
+  senhaSucesso.value = ''
+}
 
 const menuItemsVisiveis = computed(() => {
   const cargoAtual = user.value?.cargo?.toLowerCase()
@@ -277,6 +385,10 @@ const icons = {
     'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
     'M12 6v6l4 2',
   ],
+  lock: [
+    'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z',
+    'M7 11V7a5 5 0 0 1 10 0v4',
+  ],
   utilizadores: [
     'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2',
     'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
@@ -292,8 +404,8 @@ const menuItems = [
   { name: 'Produtos', path: '/dashboard/produtos', icon: icons.produtos, cargos: ['administrador', 'caixa', 'estoquista'] },
   { name: 'Estoque', path: '/dashboard/estoque', icon: icons.estoque, cargos: ['administrador', 'estoquista'] },
   { name: 'Clientes', path: '/dashboard/clientes', icon: icons.clientes },
-  { name: 'Pedidos', path: '/dashboard/caixa', icon: icons.pedidos, cargos: ['administrador', 'caixa', 'designer'] },
-  { name: 'Utilizadores', path: '/dashboard/utilizadores', icon: icons.utilizadores, cargos: ['administrador'] },
+  { name: 'Pedidos', path: '/dashboard/caixa', icon: icons.pedidos, cargos: ['administrador', 'caixa', 'designer', 'producao'] },
+  { name: 'Funcionários', path: '/dashboard/utilizadores', icon: icons.utilizadores, cargos: ['administrador'] },
 ]
 
 // Iniciais do nome (ex.: "João Silva" -> "JS")
@@ -314,19 +426,84 @@ const formatarData = (valor) => {
 
 const abrirPerfil = () => {
   userMenuOpen.value = false
+  notifOpen.value = false
+  perfilView.value = 'info'
   perfilOpen.value = true
 }
 
 const fecharPerfil = () => {
   perfilOpen.value = false
+  perfilView.value = 'info'
+  limparFormSenha()
 }
 
-// Fecha o modal com a tecla Esc
-const onKeydown = (e) => {
-  if (e.key === 'Escape' && perfilOpen.value) fecharPerfil()
+const abrirRedefinirSenha = () => {
+  limparFormSenha()
+  perfilView.value = 'senha'
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+const voltarPerfil = () => {
+  limparFormSenha()
+  perfilView.value = 'info'
+}
+
+const salvarSenha = async () => {
+  senhaErro.value = ''
+  senhaSucesso.value = ''
+
+  const { senhaAtual, novaSenha, confirmar } = senhaForm
+
+  if (!senhaAtual || !novaSenha || !confirmar) {
+    senhaErro.value = 'Preencha todos os campos.'
+    return
+  }
+  if (novaSenha.length < 6) {
+    senhaErro.value = 'A nova senha deve ter pelo menos 6 caracteres.'
+    return
+  }
+  if (novaSenha !== confirmar) {
+    senhaErro.value = 'A confirmação não coincide com a nova senha.'
+    return
+  }
+  if (novaSenha === senhaAtual) {
+    senhaErro.value = 'A nova senha deve ser diferente da atual.'
+    return
+  }
+
+  senhaLoading.value = true
+  try {
+    await store.dispatch('alterarMinhaSenha', { senhaAtual, novaSenha })
+    limparFormSenha()
+    senhaSucesso.value = 'Senha alterada com sucesso.'
+  } catch (err) {
+    senhaErro.value = err.response?.data?.message || 'Não foi possível alterar a senha.'
+  } finally {
+    senhaLoading.value = false
+  }
+}
+
+// Esc fecha dropdowns e modal
+const onKeydown = (e) => {
+  if (e.key !== 'Escape') return
+  if (perfilOpen.value) return fecharPerfil()
+  notifOpen.value = false
+  userMenuOpen.value = false
+}
+
+// Clique fora fecha os dropdowns
+const onDocClick = (e) => {
+  if (notifOpen.value && !notifRef.value?.contains(e.target)) notifOpen.value = false
+  if (userMenuOpen.value && !userMenuRef.value?.contains(e.target)) userMenuOpen.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  document.addEventListener('click', onDocClick)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('click', onDocClick)
+})
 
 const logout = async () => {
   await store.dispatch("logout", sessionId)
@@ -636,6 +813,110 @@ const logout = async () => {
   border-top: 1px dashed var(--paper-line);
 }
 
+/* Dropdown de notificações */
+.notif-dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 0.6rem;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(32, 29, 26, 0.14);
+  padding: 0.35rem;
+  z-index: 50;
+  transform-origin: top right;
+}
+
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.25rem;
+  padding: 1.4rem 1rem 1.5rem;
+}
+
+.notif-empty-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0.4rem;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  color: var(--ink-soft);
+}
+
+.notif-empty-title {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.notif-empty-text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.notif-item {
+  position: relative;
+  padding: 0.6rem 0.65rem;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.notif-item:hover {
+  background: var(--paper);
+}
+
+.notif-item-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--rule);
+}
+
+.notif-item-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.notif-item-text {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.notif-item-time {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
 /* Menu Mobile */
 .mobile-menu {
   border-top: 1px solid var(--paper-line);
@@ -701,12 +982,13 @@ const logout = async () => {
 .perfil-modal {
   width: 100%;
   max-width: 420px;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   background: #fff;
   border: 1px solid var(--paper-line);
   border-top: 3px solid var(--rule);
   border-radius: 14px;
   box-shadow: 0 24px 60px rgba(32, 29, 26, 0.28);
-  overflow: hidden;
 }
 
 .perfil-header {
@@ -873,20 +1155,118 @@ const logout = async () => {
   border-top: 1px solid var(--paper-line);
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .perfil-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   padding: 0.5rem 1.2rem;
   border-radius: 8px;
   background: var(--ink);
   color: var(--paper);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
 }
 
 .perfil-btn:hover {
   opacity: 0.85;
+}
+
+.perfil-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.perfil-btn-ghost {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--paper-line);
+}
+
+.perfil-btn-ghost:hover {
+  background: var(--paper);
+  opacity: 1;
+}
+
+/* Redefinir senha (modal de perfil) */
+.perfil-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 0 0;
+}
+
+.perfil-form-title {
+  margin: 0;
+  padding: 0 1.25rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rule);
+}
+
+.perfil-form .campo,
+.perfil-form .msg {
+  margin: 0 1.25rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.campo-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.campo-input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.campo-input:focus {
+  outline: none;
+  border-color: var(--rule);
+  box-shadow: 0 0 0 3px #fdf1f0;
+}
+
+.campo-input:disabled {
+  background: var(--paper);
+}
+
+.msg {
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.msg-erro {
+  color: var(--rule);
+  background: #fdf1f0;
+}
+
+.msg-ok {
+  color: var(--ok);
+  background: #eaf5ef;
+}
+
+.perfil-footer-form {
+  margin-top: 0.4rem;
 }
 
 /* Animações (respondem a uma ação do utilizador) */

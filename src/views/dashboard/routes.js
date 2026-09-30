@@ -68,5 +68,15 @@ export default [
             title: 'Utilizadores | Painel de controlo',
         },
         component: () => import('./Layout.vue') 
+    },
+    {
+        name: 'RankingFuncionarios',
+        path: '/dashboard/utilizadores/ranking-funcionarios',
+        meta: {
+            requiresAuth: true,
+            rootPage: 'dashboard',
+            title: 'Ranking de Funcionários | Painel de controlo',
+        },
+        component: () => import('./Layout.vue')
     }
 ]

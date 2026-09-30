@@ -3,10 +3,13 @@
     <!-- Cabeçalho -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
-        <h1 class="ledger-title">Utilizadores</h1>
+        <h1 class="ledger-title">Funcionários</h1>
         <p class="text-sm text-stone-500 mt-1">Contas de acesso ao sistema e respectivos cargos</p>
       </div>
-      <button class="btn-primary" @click="abrirModalNovo">+ Novo Utilizador</button>
+      <div class="flex gap-2">
+        <router-link to="/dashboard/utilizadores/ranking-funcionarios" class="btn-ghost">Ver Classificação</router-link>
+        <button class="btn-primary" @click="abrirModalNovo">+ Novo Utilizador</button>
+      </div>
     </div>
 
     <!-- Cartões de resumo -->
@@ -343,7 +346,9 @@ const cargos = [
   { valor: 'administrador', label: 'Administrador' },
   { valor: 'caixa', label: 'Caixa' },
   { valor: 'designer', label: 'Designer' },
+  { valor: 'producao', label: 'Produção' },
   { valor: 'estoquista', label: 'Estoquista' },
+  { valor: 'visualizador', label: 'Visualizador' },
 ]
 const cargoLabel = (v) => cargos.find((c) => c.valor === v)?.label || v
 
@@ -412,14 +417,14 @@ const fecharModal = (id) => {
 }
 
 // --- Criar/Editar ---
-const form = ref({ nomeProprio: '', apelido: '', email: '', telefone: '', cargo: 'estoquista', ativo: true })
+const form = ref({ nomeProprio: '', apelido: '', email: '', telefone: '', cargo: 'visualizador', ativo: true })
 const errors = ref({})
 const salvando = ref(false)
 const modoEdicao = ref(false)
 const utilizadorSelecionado = ref(null)
 
 const resetForm = () => {
-  form.value = { nomeProprio: '', apelido: '', email: '', telefone: '', cargo: 'estoquista', ativo: true }
+  form.value = { nomeProprio: '', apelido: '', email: '', telefone: '', cargo: 'visualizador', ativo: true }
   errors.value = {}
   modoEdicao.value = false
   utilizadorSelecionado.value = null
@@ -580,6 +585,7 @@ const formatarData = (d) => new Date(d).toLocaleString('pt-PT')
   --ok: #2f7d53;
   --amber: #b8860b;
   --blue: #2563eb;
+  --violet: #7c3aed;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -642,6 +648,8 @@ const formatarData = (d) => new Date(d).toLocaleString('pt-PT')
 .badge-administrador { background: #fff0f1; color: var(--rule); }
 .badge-caixa { background: #ecfdf5; color: var(--ok); }
 .badge-designer { background: #fff8e8; color: var(--amber); }
+.badge-producao { background: #f3e8ff; color: var(--violet); }
+.badge-estoquista { background: #f3e8ff; color: var(--violet); }
 .badge-visualizador { background: #eaf1ff; color: var(--blue); }
 
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 0.4rem; }

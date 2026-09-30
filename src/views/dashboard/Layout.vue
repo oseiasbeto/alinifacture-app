@@ -11,6 +11,7 @@ import Clientes from "./pages/Clientes.vue";
 import Produto from "./pages/Produto.vue";
 import Estoque from "./pages/Estoque.vue";
 import Utilizadores from "./pages/Utilizadores.vue";
+import RankingFuncionarios from "./pages/Rankingfuncionarios.vue";
 
 const route = useRoute()
 const router = useRouter()
@@ -136,6 +137,7 @@ onMounted(async () => {
                     <Estoque v-if="route.path == '/dashboard/estoque'" />
                     <Caixa v-if="route.path == '/dashboard/caixa'" />
                     <Utilizadores v-if="route.path == '/dashboard/utilizadores'" />
+                    <RankingFuncionarios v-if="route.path == '/dashboard/utilizadores/ranking-funcionarios'" />
                 </div>
             </div>
         </main>

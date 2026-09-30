@@ -12,7 +12,8 @@
     <div class="periodo-bar">
       <div class="preset-pills">
         <button class="pill-btn" :class="{ active: preset === 'hoje' }" @click="aplicarPreset('hoje')">Hoje</button>
-        <button class="pill-btn" :class="{ active: preset === 'semana' }" @click="aplicarPreset('semana')">Esta semana</button>
+        <button class="pill-btn" :class="{ active: preset === 'semana' }" @click="aplicarPreset('semana')">Esta
+          semana</button>
         <button class="pill-btn" :class="{ active: preset === 'mes' }" @click="aplicarPreset('mes')">Este mês</button>
         <button class="pill-btn" :class="{ active: preset === 'ano' }" @click="aplicarPreset('ano')">Este ano</button>
       </div>
@@ -32,7 +33,7 @@
 
     <template v-else-if="dashboard">
       <!-- Cartões de resumo -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div v-if="veFinanceiro" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="stat-card stat-emerald">
           <span class="stat-tab"></span>
           <p class="stat-label">Receitas</p>
@@ -56,7 +57,7 @@
       </div>
 
       <!-- Gráfico: Receitas x Despesas -->
-      <div class="ledger-panel p-5">
+      <div v-if="veFinanceiro" class="ledger-panel p-5">
         <p class="form-section-title">Receitas x Despesas por dia</p>
         <div class="chart-wrap">
           <canvas ref="canvasReceitasDespesas"></canvas>
@@ -94,7 +95,7 @@
       </div>
 
       <!-- Estoque -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div v-if="veFinanceiro" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="stat-card stat-blue">
           <span class="stat-tab"></span>
           <p class="stat-label">Valor em estoque (ao custo)</p>
@@ -120,6 +121,18 @@ const store = useStore()
 const dashboard = computed(() => store.getters.dashboard)
 const loadingDashboard = computed(() => store.getters.loadingDashboard || false)
 const errorDashboard = computed(() => store.getters.errorDashboard || null)
+
+const user = computed(() => store.getters.currentUser)
+
+const CARGOS_SEM_FINANCEIRO = ['designer', 'producao']
+const normalizar = (s) =>
+  String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+// Só mostra depois de o cargo estar carregado, para não piscar dados a quem não deve ver
+const veFinanceiro = computed(() => {
+  const cargo = normalizar(user.value?.cargo)
+  return !!cargo && !CARGOS_SEM_FINANCEIRO.includes(cargo)
+})
 
 const toISODate = (date) => {
   const d = new Date(date)
@@ -261,47 +274,248 @@ onBeforeUnmount(() => {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-.eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--rule); margin: 0; }
-.ledger-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.75rem; color: var(--ink); margin-top: 0.15rem; }
-.text-ink { color: var(--ink); }
-.text-rule { color: var(--rule); }
-.num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rule);
+  margin: 0;
+}
+
+.ledger-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--ink);
+  margin-top: 0.15rem;
+}
+
+.text-ink {
+  color: var(--ink);
+}
+
+.text-rule {
+  color: var(--rule);
+}
+
+.num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Filtro de período */
-.periodo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; }
-.preset-pills { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-.pill-btn { font-size: 0.78rem; padding: 0.35rem 0.8rem; border-radius: 999px; border: 1px solid var(--paper-line); background: #fff; color: var(--ink-soft); font-weight: 600; }
-.pill-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-.date-range { display: flex; align-items: center; gap: 0.4rem; }
-.date-range .ledger-input { width: auto; padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+.periodo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
 
-.ledger-input { border: 1px solid var(--paper-line); background: #fff; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.875rem; color: var(--ink); outline: none; }
-.ledger-input:focus { border-color: var(--ink); }
+.preset-pills {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.pill-btn {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.pill-btn.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.date-range .ledger-input {
+  width: auto;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.ledger-input {
+  border: 1px solid var(--paper-line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  outline: none;
+}
+
+.ledger-input:focus {
+  border-color: var(--ink);
+}
 
 /* Cartões de resumo */
-.stat-card { position: relative; border-radius: 10px; padding: 1rem 1.1rem 0.9rem; overflow: hidden; border: 1px solid var(--paper-line); transition: transform 0.15s, box-shadow 0.15s; }
-.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
-.stat-tab { position: absolute; top: 0; left: 0; width: 100%; height: 4px; }
+.stat-card {
+  position: relative;
+  border-radius: 10px;
+  padding: 1rem 1.1rem 0.9rem;
+  overflow: hidden;
+  border: 1px solid var(--paper-line);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
 
-.stat-blue { background: #eaf1ff; border-color: #c7dbff; } .stat-blue .stat-tab { background: var(--blue); } .stat-blue .stat-value { color: #1d4ed8; }
-.stat-rose { background: #fff0f1; border-color: #ffd0d4; } .stat-rose .stat-tab { background: var(--rule); } .stat-rose .stat-value { color: #be123c; }
-.stat-emerald { background: #ecfdf5; border-color: #bdf0d6; } .stat-emerald .stat-tab { background: var(--ok); } .stat-emerald .stat-value { color: #047857; }
-.stat-amber { background: #fff8e8; border-color: #fbe2a6; } .stat-amber .stat-tab { background: var(--amber); } .stat-amber .stat-value { color: #b45309; }
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
 
-.stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-top: 0.4rem; }
-.stat-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 1.35rem; color: var(--ink); margin-top: 0.15rem; }
+.stat-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+
+.stat-blue {
+  background: #eaf1ff;
+  border-color: #c7dbff;
+}
+
+.stat-blue .stat-tab {
+  background: var(--blue);
+}
+
+.stat-blue .stat-value {
+  color: #1d4ed8;
+}
+
+.stat-rose {
+  background: #fff0f1;
+  border-color: #ffd0d4;
+}
+
+.stat-rose .stat-tab {
+  background: var(--rule);
+}
+
+.stat-rose .stat-value {
+  color: #be123c;
+}
+
+.stat-emerald {
+  background: #ecfdf5;
+  border-color: #bdf0d6;
+}
+
+.stat-emerald .stat-tab {
+  background: var(--ok);
+}
+
+.stat-emerald .stat-value {
+  color: #047857;
+}
+
+.stat-amber {
+  background: #fff8e8;
+  border-color: #fbe2a6;
+}
+
+.stat-amber .stat-tab {
+  background: var(--amber);
+}
+
+.stat-amber .stat-value {
+  color: #b45309;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-top: 0.4rem;
+}
+
+.stat-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 1.35rem;
+  color: var(--ink);
+  margin-top: 0.15rem;
+}
 
 /* Painéis e gráficos */
-.ledger-panel { background: #fff; border: 1px solid var(--paper-line); border-radius: 12px; }
-.form-section-title { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rule); margin-bottom: 0.9rem; }
-.chart-wrap { position: relative; height: 280px; }
-.chart-wrap-sm { height: 220px; }
+.ledger-panel {
+  background: #fff;
+  border: 1px solid var(--paper-line);
+  border-radius: 12px;
+}
+
+.form-section-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rule);
+  margin-bottom: 0.9rem;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 280px;
+}
+
+.chart-wrap-sm {
+  height: 220px;
+}
 
 /* Top produtos */
-.top-produtos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.9rem; }
-.bar-track { background: var(--paper); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 0.25rem; }
-.bar-fill { background: var(--ink); height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.top-produtos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
 
-.spinner { width: 28px; height: 28px; border: 3px solid var(--paper-line); border-top-color: var(--ink); border-radius: 50%; margin: 0 auto; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.bar-track {
+  background: var(--paper);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.bar-fill {
+  background: var(--ink);
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--paper-line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

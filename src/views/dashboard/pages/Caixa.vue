@@ -24,7 +24,7 @@
       <div class="stat-card stat-amber">
         <span class="stat-tab"></span>
         <p class="stat-label">Prontos p/ entrega</p>
-        <p class="stat-value">{{ resumo.pronto }}</p>
+        <p class="stat-value">{{ resumo.pronto_entrega }}</p>
       </div>
       <div class="stat-card stat-emerald">
         <span class="stat-tab"></span>
@@ -99,6 +99,10 @@
                   <span class="status-dot"></span>
                   {{ statusLabel(pedido.status) }}
                 </span>
+                <span v-if="pedido.tipoPagamento === 'ordem_saque'" class="os-badge"
+                  :class="{ 'os-recebido': !ordemSaquePendente(pedido) }">
+                  {{ ordemSaquePendente(pedido) ? 'Ordem de saque · a receber' : 'Ordem de saque · recebida' }}
+                </span>
               </td>
               <td class="text-right whitespace-nowrap" @click.stop>
                 <button v-for="prox in proximosStatusPermitidos(pedido.status)" :key="prox" class="btn-icon"
@@ -106,6 +110,9 @@
                   @click="pedirConfirmacaoStatus(pedido, prox)">
                   {{ iconePorStatus(prox) }}
                 </button>
+                <button v-if="podeGerirPedidos && ordemSaquePendente(pedido) && pedido.status !== 'cancelado'"
+                  class="btn-icon btn-ok" title="Confirmar recebimento da ordem de saque"
+                  @click="abrirRecebimento(pedido)">💰</button>
                 <button v-if="podeGerirPedidos" class="btn-icon" title="Gerar Factura/Recibo (PDF)"
                   @click="gerarFacturaPedido(pedido)">🧾</button>
                 <button class="btn-icon" title="Detalhes" @click="abrirDetalhes(pedido)">≡</button>
@@ -256,6 +263,37 @@
                   <input type="date" class="ledger-input" v-model="form.dataEntregaPrevista" />
                   <small class="text-stone-500 d-block mt-1">{{ prazoLabel }}</small>
                 </div>
+
+                <!-- Modalidade de pagamento -->
+                <div class="col-md-6">
+                  <label class="ledger-label">Modalidade de pagamento</label>
+                  <select class="ledger-input" v-model="form.tipoPagamento">
+                    <option value="a_vista">À vista</option>
+                    <option value="ordem_saque">Ordem de saque</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6" v-if="!ehOrdemSaque">
+                  <label class="ledger-label">Método de pagamento</label>
+                  <select class="ledger-input" v-model="form.metodoPagamento">
+                    <option v-for="m in metodoPagamentoDisponiveis" :key="m.nome" :value="m.nome">{{ m.nome }}</option>
+                  </select>
+                </div>
+
+                <template v-else>
+                  <div class="col-md-6">
+                    <label class="ledger-label">Nº da ordem de saque <span class="text-stone-400">(opcional)</span></label>
+                    <input type="text" class="ledger-input num" v-model="form.ordemSaqueNumero" />
+                  </div>
+                  <div class="col-12">
+                    <label class="ledger-label">Entidade pagadora <span class="text-stone-400">(opcional)</span></label>
+                    <input type="text" class="ledger-input" v-model="form.ordemSaqueEntidade"
+                      placeholder="Ex: Administração Municipal, Direcção Provincial..." />
+                    <small class="text-stone-500 d-block mt-1">
+                      O valor só entra nas receitas quando o caixa confirmar o recebimento.
+                    </small>
+                  </div>
+                </template>
 
                 <div class="col-12">
                   <label class="ledger-label">Observações</label>
@@ -526,6 +564,34 @@
       </div>
     </div>
 
+    <!-- Modal Confirmar Recebimento de Ordem de Saque -->
+    <div class="modal fade" id="receberOrdemSaqueModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content ledger-modal">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirmar recebimento</h5>
+            <button type="button" class="btn-close" @click="fecharModal('receberOrdemSaqueModal')"></button>
+          </div>
+          <div class="modal-body" v-if="recebimento.pedido">
+            <p class="text-sm text-ink">
+              Confirme que o dinheiro do pedido <strong class="num">{{ recebimento.pedido.numeroPedido }}</strong>
+              ({{ formatarMoeda(recebimento.pedido.valorTotal) }}) já refletiu na conta.
+            </p>
+            <label class="ledger-label mt-3">Data do recebimento</label>
+            <input type="date" class="ledger-input" v-model="recebimento.dataRecebimento" />
+            <label class="ledger-label mt-3">Observação (opcional)</label>
+            <textarea class="ledger-input" rows="2" v-model="recebimento.observacao"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-ghost" @click="fecharModal('receberOrdemSaqueModal')">Cancelar</button>
+            <button type="button" class="btn-primary" :disabled="salvandoRecebimento" @click="confirmarRecebimento">
+              {{ salvandoRecebimento ? 'Confirmando...' : 'Confirmar recebimento' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Detalhes / Status -->
     <div class="modal fade" id="detalhesPedidoModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg">
@@ -586,6 +652,24 @@
                 <dd>{{ pedidoAtivo.especificacoes }}</dd>
               </div>
             </dl>
+
+            <!-- Ordem de saque -->
+            <div v-if="pedidoAtivo.tipoPagamento === 'ordem_saque'" class="anexos-detalhe">
+              <p class="form-section-title">Ordem de saque</p>
+              <p class="text-sm">
+                <span class="os-badge" :class="{ 'os-recebido': !ordemSaquePendente(pedidoAtivo) }">
+                  {{ ordemSaquePendente(pedidoAtivo) ? 'A receber' : 'Recebida em ' +
+                    formatarDataCurta(pedidoAtivo.ordemSaque?.dataRecebimento) }}
+                </span>
+                <span v-if="pedidoAtivo.ordemSaque?.numero"> · Nº <span class="num">{{ pedidoAtivo.ordemSaque.numero
+                }}</span></span>
+                <span v-if="pedidoAtivo.ordemSaque?.entidade"> · {{ pedidoAtivo.ordemSaque.entidade }}</span>
+                  <span v-if="pedidoAtivo.ordemSaque?.recebidoPor"> - {{ pedidoAtivo.ordemSaque.recebidoPor.nomeProprio }}</span>
+              </p>
+              <button v-if="podeGerirPedidos && ordemSaquePendente(pedidoAtivo) && pedidoAtivo.status !== 'cancelado'"
+                type="button" class="btn-ghost mt-2" @click="abrirRecebimento(pedidoAtivo)">💰 Confirmar
+                recebimento</button>
+            </div>
 
             <!-- Ilustrações do pedido (para o designer) -->
             <div v-if="pedidoAtivo.imagens?.length" class="anexos-detalhe">
@@ -659,6 +743,7 @@ const STATUS_LABELS = {
   pendente: 'Pendente',
   em_execucao: 'Em Execução',
   pronto: 'Pronto',
+  pronto_entrega: 'Pronto para Entrega',
   entregue: 'Entregue',
   cancelado: 'Cancelado',
 }
@@ -666,14 +751,15 @@ const STATUS_LABELS = {
 const TRANSICOES = {
   pendente: ['em_execucao', 'cancelado'],
   em_execucao: ['pronto', 'pendente', 'cancelado'],
-  pronto: ['entregue', 'em_execucao', 'cancelado'],
+  pronto: ['pronto_entrega', 'em_execucao', 'cancelado'],
+  pronto_entrega: ['entregue', 'em_execucao', 'cancelado'],
   entregue: [],
   cancelado: [],
 }
 
 // Ícone e cor de destaque de cada botão de status na tabela.
-const ICONES_STATUS = { pendente: '↺', em_execucao: '▶', pronto: '✓', entregue: '✔', cancelado: '✕' }
-const CLASSES_STATUS = { pendente: '', em_execucao: 'btn-blue', pronto: 'btn-amber', entregue: 'btn-ok', cancelado: 'btn-rule' }
+const ICONES_STATUS = { pendente: '↺', em_execucao: '▶', pronto: '✓', pronto_entrega: '✔', entregue: '✔', cancelado: '✕' }
+const CLASSES_STATUS = { pendente: '', em_execucao: 'btn-blue', pronto: 'btn-amber', pronto_entrega: 'btn-orange', entregue: 'btn-ok', cancelado: 'btn-rule' }
 
 const abas = [
   { valor: '', label: 'Todos' },
@@ -704,6 +790,14 @@ const servicosDisponiveis = [
   { nome: 'T-shirts Personalizadas', precoAdicional: 0 },
   { nome: 'Placas Sinaléticas', precoAdicional: 0 },
   { nome: SERVICO_OUTRO, precoAdicional: 0 }, // "Outro": o valor adicional é digitado no formulário
+]
+
+const metodoPagamentoDisponiveis = [
+  { nome: 'Dinheiro' },
+  { nome: 'Transferência Bancária' },
+  { nome: 'Multicaixa Express' },
+  { nome: 'Cartão de Crédito/Débito' },
+  { nome: 'Outro' },
 ]
 
 // Texto de cada opção do select: mostra o adicional quando existir.
@@ -758,10 +852,10 @@ const produtosListados = computed(() => store.getters.produtosListados || [])
 const usuarioLogado = computed(() => store.getters.currentUser || {})
 
 // --- Permissões por cargo ---
-// Apenas "caixa" e "administrador" podem criar pedidos, gerar factura/recibo e alterar QUALQUER
-// status (incluindo cancelar e marcar como entregue). O "designer" só pode avançar o pedido para
-// "Em Execução" ou "Pronto" — nenhuma outra ação de gestão de pedidos fica disponível para ele.
-// Qualquer outro cargo não listado não tem permissão para nenhuma destas ações.
+// Apenas "caixa" e "administrador" podem criar pedidos, gerar factura/recibo, confirmar recebimento de
+// ordens de saque e alterar QUALQUER status (incluindo cancelar e marcar como entregue). O "designer" só
+// pode avançar o pedido para "Em Execução" ou "Pronto" — nenhuma outra ação de gestão de pedidos fica
+// disponível para ele. Qualquer outro cargo não listado não tem permissão para nenhuma destas ações.
 const CARGOS_GESTAO_PEDIDOS = ['caixa', 'administrador']
 
 // Transições que o designer pode aplicar, por status ACTUAL do pedido (não apenas por status de
@@ -772,6 +866,16 @@ const TRANSICOES_DESIGNER = {
   pendente: ['em_execucao'],
   em_execucao: ['pronto'],
   pronto: [],
+  pronto_entrega: [], 
+  entregue: [],
+  cancelado: [],
+}
+
+const TRANSICOES_PRODUCAO = {
+  pendente: ['em_execucao'],
+  em_execucao: ['pronto'],
+  pronto: ['pronto_entrega'],
+  pronto_entrega: [],
   entregue: [],
   cancelado: [],
 }
@@ -782,6 +886,8 @@ const podeGerirPedidos = computed(() => {
 })
 
 const ehDesigner = computed(() => usuarioLogado.value?.cargo?.toLowerCase() === 'designer')
+const ehProducao = computed(() => usuarioLogado.value?.cargo?.toLowerCase() === 'producao')
+const ehCaixa = computed(() => usuarioLogado.value?.cargo?.toLowerCase() === 'caixa')
 
 // Transições de status disponíveis para o utilizador actual, no status actual do pedido.
 // Usada em vez de proximosStatus() em todos os pontos da UI.
@@ -789,6 +895,8 @@ const proximosStatusPermitidos = (statusAtual) => {
   const opcoes = proximosStatus(statusAtual)
   if (podeGerirPedidos.value) return opcoes
   if (ehDesigner.value) return (TRANSICOES_DESIGNER[statusAtual] || []).filter((s) => opcoes.includes(s))
+  if (ehProducao.value) return (TRANSICOES_PRODUCAO[statusAtual] || []).filter((s) => opcoes.includes(s))
+  if (ehCaixa.value) return ['cancelado', 'entregue'].filter((s) => opcoes.includes(s))
   return []
 }
 
@@ -1018,6 +1126,7 @@ const salvarImagensTardias = async () => {
 const form = ref({
   cliente: '', produto: '', tipoProduto: '', servicoOutro: '', adicionalOutro: '',
   especificacoes: '', quantidade: 1, precoUnitario: '', dataEntregaPrevista: '', observacoes: '',
+  metodoPagamento: 'Dinheiro', tipoPagamento: 'a_vista', ordemSaqueNumero: '', ordemSaqueEntidade: '',
 })
 const errors = ref({})
 const salvando = ref(false)
@@ -1029,6 +1138,11 @@ const formatarMoeda = (v) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(v) || 0)}kz`
+
+// Modalidade de pagamento
+const ehOrdemSaque = computed(() => form.value.tipoPagamento === 'ordem_saque')
+// Ordem de saque cujo dinheiro ainda não refletiu na conta
+const ordemSaquePendente = (p) => p?.tipoPagamento === 'ordem_saque' && p?.ordemSaque?.estado !== 'recebido'
 
 // Serviço escolhido e respectivo valor adicional (por unidade)
 const ehOutroServico = computed(() => form.value.tipoProduto === SERVICO_OUTRO)
@@ -1064,6 +1178,7 @@ const resetForm = () => {
   form.value = {
     cliente: '', produto: '', tipoProduto: '', servicoOutro: '', adicionalOutro: '',
     especificacoes: '', quantidade: 1, precoUnitario: '', dataEntregaPrevista: calcularPrazoPadrao(), observacoes: '',
+    metodoPagamento: 'Dinheiro', tipoPagamento: 'a_vista', ordemSaqueNumero: '', ordemSaqueEntidade: '',
   }
   errors.value = {}
   clienteSelecionado.value = null
@@ -1232,6 +1347,15 @@ const salvarPedido = async () => {
       valorAdicionalServico: adicionalServico.value > 0 ? adicionalServico.value : undefined,
       observacoes: form.value.observacoes?.trim() || undefined,
       imagens: anexos.value.map((a) => a.publicId).filter(Boolean),
+      // Modalidade de pagamento
+      tipoPagamento: form.value.tipoPagamento,
+      metodoPagamento: ehOrdemSaque.value ? undefined : form.value.metodoPagamento,
+      ordemSaque: ehOrdemSaque.value
+        ? {
+          numero: form.value.ordemSaqueNumero?.trim() || undefined,
+          entidade: form.value.ordemSaqueEntidade?.trim() || undefined,
+        }
+        : undefined,
     })
     toast('Pedido criado com sucesso!', { type: 'success', autoClose: 2500 })
     fecharModal('novoPedidoModal')
@@ -1252,6 +1376,41 @@ const abrirDetalhes = async (pedidoResumido) => {
     abrirModal('detalhesPedidoModal')
   } catch (err) {
     toast('Não foi possível carregar os detalhes do pedido', { type: 'error', autoClose: 2500 })
+  }
+}
+
+// --- Recebimento de ordem de saque (só caixa/administrador) ---
+const recebimento = ref({ pedido: null, dataRecebimento: '', observacao: '' })
+const salvandoRecebimento = ref(false)
+
+const abrirRecebimento = async (pedido) => {
+  if (!podeGerirPedidos.value) {
+    toast('Apenas caixa e administrador podem confirmar recebimentos', { type: 'error', autoClose: 2500 })
+    return
+  }
+  // Se veio do modal de detalhes, fecha-o antes de abrir a confirmação
+  await fecharModalAsync('detalhesPedidoModal')
+  recebimento.value = { pedido, dataRecebimento: toISODate(new Date()), observacao: '' }
+  abrirModal('receberOrdemSaqueModal')
+}
+
+const confirmarRecebimento = async () => {
+  const { pedido, dataRecebimento, observacao } = recebimento.value
+  if (!pedido || !podeGerirPedidos.value) return
+  salvandoRecebimento.value = true
+  try {
+    await store.dispatch('receberOrdemSaque', {
+      id: pedido._id,
+      dataRecebimento: dataRecebimento || undefined,
+      observacao: observacao?.trim() || undefined,
+    })
+    toast('Recebimento confirmado!', { type: 'success', autoClose: 2500 })
+    fecharModal('receberOrdemSaqueModal')
+    await Promise.all([carregarPedidos(), carregarResumo()])
+  } catch (err) {
+    toast(err.response?.data?.message || 'Erro ao confirmar recebimento', { type: 'error', autoClose: 3000 })
+  } finally {
+    salvandoRecebimento.value = false
   }
 }
 
@@ -1338,6 +1497,8 @@ const ENDERECO_GRAFICA = 'Bairro: Agustinho Neto, Rua: Deolinda Rodrigues , Lund
 const EMAIL_GRAFICA = 'casimiroquiala2010@hotmail.com' // TODO: colocar o e-mail real
 const TELEFONE_GRAFICA = '+244 936 721 489' // TODO: colocar o telefone real
 
+const MODALIDADE_LABEL = { a_vista: 'À vista', ordem_saque: 'Ordem de saque' }
+
 const montarPDFFactura = (pedido) => {
   // Código de barras (CODE128) com o número do pedido, desenhado num canvas oculto
   const canvasBarcode = document.createElement('canvas')
@@ -1359,6 +1520,8 @@ const montarPDFFactura = (pedido) => {
 
   const doc = new jsPDF({ unit: 'mm', format: [LARGURA, ALTURA], orientation: 'portrait' })
   const totalPedido = pedido.valorTotal ?? (Number(pedido.precoUnitario || 0) * Number(pedido.quantidade || 0))
+
+  const ehOrdemSaque = pedido.tipoPagamento === 'ordem_saque'
 
   let y = 6
 
@@ -1403,7 +1566,7 @@ const montarPDFFactura = (pedido) => {
   // Título e dados do documento
   doc.setFontSize(10)
   doc.setFont(undefined, 'bold')
-  doc.text('Factura / Recibo', CENTRO, y, { align: 'center' })
+  doc.text('FACTURA PRÓ-FORMA', CENTRO, y, { align: 'center' })
   y += 5
   doc.setFontSize(8)
   doc.setFont(undefined, 'normal')
@@ -1467,7 +1630,27 @@ const montarPDFFactura = (pedido) => {
     y += 4
   }
   doc.text(`Quantidade: ${pedido.quantidade ?? '-'}`, M, y)
-  y += 5
+  y += 4
+
+  // Modalidade e método de pagamento
+  doc.text(`Modalidade: ${MODALIDADE_LABEL[pedido.tipoPagamento] || 'À vista'}`, M, y)
+  y += 4
+  doc.text(`Método: ${pedido.metodoPagamento || '-'}`, M, y)
+  y += 4
+
+  // Dados da ordem de saque (só aparecem se preenchidos)
+  if (ehOrdemSaque) {
+    if (pedido.ordemSaque?.numero) {
+      doc.text(`Ordem de saque nº: ${pedido.ordemSaque.numero}`, M, y)
+      y += 4
+    }
+    if (pedido.ordemSaque?.entidade) {
+      const linhasEntidade = doc.splitTextToSize(`Entidade: ${pedido.ordemSaque.entidade}`, LARGURA - 2 * M)
+      doc.text(linhasEntidade, M, y)
+      y += linhasEntidade.length * 3.5 + 0.5
+    }
+  }
+  y += 1
 
   doc.line(M, y, DIREITA, y)
 
@@ -1484,6 +1667,12 @@ const montarPDFFactura = (pedido) => {
   const barH = 18
   const barY = finalY + 8
   doc.addImage(barcodeDataUrl, 'PNG', CENTRO - barW / 2, barY, barW, barH)
+
+  // Aviso da pró-forma (em todas as facturas)
+  doc.setFontSize(6.5)
+  doc.setFont(undefined, 'bold')
+  doc.setTextColor(0, 0, 0)
+  doc.text('Documento pró-forma — sem valor de recibo.', CENTRO, barY + barH + 7, { align: 'center' })
 
   // Mensagem de agradecimento
   doc.setFontSize(8)
@@ -1841,6 +2030,10 @@ const montarPDFFactura = (pedido) => {
   background: #fff8e8;
   color: var(--amber);
 }
+.badge-pronto_entrega {
+  background: #fff8e8;
+  color: var(--amber);
+}
 
 .badge-entregue {
   background: #ecfdf5;
@@ -1869,6 +2062,10 @@ const montarPDFFactura = (pedido) => {
 }
 
 .dot-pronto {
+  background: var(--amber);
+}
+
+.dot-pronto_entrega {
   background: var(--amber);
 }
 
@@ -2208,6 +2405,24 @@ const montarPDFFactura = (pedido) => {
   color: #fff;
   background: var(--rule);
   white-space: nowrap;
+}
+
+/* Ordem de saque */
+.os-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--amber);
+  background: #fff8e8;
+  white-space: nowrap;
+}
+
+.os-badge.os-recebido {
+  color: var(--ok);
+  background: #ecfdf5;
 }
 
 @keyframes spin {
